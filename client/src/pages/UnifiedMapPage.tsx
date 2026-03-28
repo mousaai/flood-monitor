@@ -1036,7 +1036,7 @@ export default function UnifiedMapPage() {
   );
 
   return (
-    <div style={{ display: 'flex', height: '100%', background: 'var(--bg-primary)', fontFamily: 'Tajawal, sans-serif', direction: lang === 'ar' ? 'rtl' : 'ltr', position: 'relative' }}>
+    <div style={{ display: 'flex', height: '100%', width: '100%', background: 'var(--bg-primary)', fontFamily: 'Tajawal, sans-serif', direction: lang === 'ar' ? 'rtl' : 'ltr', position: 'relative', overflow: 'hidden' }}>
 
       {/* ── Side Panel (Desktop only) ── */}
       <div style={{
@@ -1344,7 +1344,7 @@ export default function UnifiedMapPage() {
       </div>
 
       {/* ── Right Column: Map + Timeline ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, width: isMobile ? '100%' : undefined, position: isMobile ? 'absolute' : 'relative', inset: isMobile ? '0' : undefined }}>
       {/* ── Map ── */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
