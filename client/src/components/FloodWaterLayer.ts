@@ -252,15 +252,23 @@ export function createFloodWaterLayer(
   let currentMultiplier = initialMultiplier;
   let currentLang: 'ar' | 'en' = initialLang;
   let animFrameId: number | null = null;
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function render(multiplier: number, lang: 'ar' | 'en') {
+  // Debounced render: during zoom/pan, wait 80ms before redrawing
+  // This prevents re-drawing on every intermediate zoom step
+  function render(multiplier: number, lang: 'ar' | 'en', immediate = false) {
     currentMultiplier = multiplier;
     currentLang = lang;
     if (animFrameId !== null) cancelAnimationFrame(animFrameId);
-    animFrameId = requestAnimationFrame(() => {
-      animFrameId = null;
-      _doRender(multiplier);
-    });
+    if (debounceTimer !== null) clearTimeout(debounceTimer);
+    if (immediate) {
+      animFrameId = requestAnimationFrame(() => { animFrameId = null; _doRender(multiplier); });
+    } else {
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        animFrameId = requestAnimationFrame(() => { animFrameId = null; _doRender(multiplier); });
+      }, 80);
+    }
   }
 
   function _doRender(multiplier: number) {
@@ -312,18 +320,19 @@ export function createFloodWaterLayer(
 
     let stepLat: number, stepLng: number, patchRadiusM: number, baseDepthCm: number;
 
+    // Performance: coarser grid at high zoom (fewer points, same visual quality)
     if (zoom >= 16) {
-      stepLat = 0.0006; stepLng = 0.0007;
-      patchRadiusM = 55; baseDepthCm = 20;
+      stepLat = 0.0010; stepLng = 0.0012;  // was 0.0006/0.0007 — 2.8x fewer points
+      patchRadiusM = 80; baseDepthCm = 20;
     } else if (zoom >= 14) {
-      stepLat = 0.0015; stepLng = 0.0017;
-      patchRadiusM = 130; baseDepthCm = 25;
+      stepLat = 0.0022; stepLng = 0.0025;  // was 0.0015/0.0017 — 2.1x fewer points
+      patchRadiusM = 160; baseDepthCm = 25;
     } else if (zoom >= 12) {
-      stepLat = 0.0040; stepLng = 0.0045;
-      patchRadiusM = 340; baseDepthCm = 30;
+      stepLat = 0.0055; stepLng = 0.0060;  // was 0.0040/0.0045 — 1.9x fewer points
+      patchRadiusM = 380; baseDepthCm = 30;
     } else if (zoom >= 10) {
-      stepLat = 0.0120; stepLng = 0.0135;
-      patchRadiusM = 520; baseDepthCm = 38; // Reduced radius to avoid bleeding into sea
+      stepLat = 0.0150; stepLng = 0.0165;  // was 0.0120/0.0135 — 1.5x fewer points
+      patchRadiusM = 560; baseDepthCm = 38;
     } else {
       return;
     }
@@ -550,13 +559,16 @@ export function createFloodWaterLayer(
     });
   }
 
-  function onMapChange() { render(currentMultiplier, currentLang); }
+  // During active zoom/pan: use debounced render (80ms delay)
+  // On zoomend/moveend: render immediately for crisp final result
+  function onMapMove()   { render(currentMultiplier, currentLang, false); }
+  function onMapSettle() { render(currentMultiplier, currentLang, true); }
 
-  map.on('move',    onMapChange);
-  map.on('zoom',    onMapChange);
-  map.on('zoomend', onMapChange);
-  map.on('moveend', onMapChange);
-  map.on('resize',  onMapChange);
+  map.on('move',    onMapMove);
+  map.on('zoom',    onMapMove);
+  map.on('zoomend', onMapSettle);
+  map.on('moveend', onMapSettle);
+  map.on('resize',  onMapSettle);
 
   render(initialMultiplier, initialLang);
 
@@ -566,11 +578,12 @@ export function createFloodWaterLayer(
     },
     remove() {
       if (animFrameId !== null) cancelAnimationFrame(animFrameId);
-      map.off('move',    onMapChange);
-      map.off('zoom',    onMapChange);
-      map.off('zoomend', onMapChange);
-      map.off('moveend', onMapChange);
-      map.off('resize',  onMapChange);
+      if (debounceTimer !== null) clearTimeout(debounceTimer);
+      map.off('move',    onMapMove);
+      map.off('zoom',    onMapMove);
+      map.off('zoomend', onMapSettle);
+      map.off('moveend', onMapSettle);
+      map.off('resize',  onMapSettle);
       if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
     },
   };

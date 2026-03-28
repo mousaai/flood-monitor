@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import compression from "compression";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
@@ -32,9 +33,23 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // Gzip compression for all responses (reduces payload size by ~70%)
+  app.use(compression());
+
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Cache headers for static assets (JS/CSS/images) — 1 year
+  app.use((req, res, next) => {
+    if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (req.path.startsWith('/api/trpc/weather')) {
+      // Weather API: cache for 3 minutes (data refreshes every 5 min)
+      res.setHeader('Cache-Control', 'public, max-age=180, stale-while-revalidate=60');
+    }
+    next();
+  });
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API

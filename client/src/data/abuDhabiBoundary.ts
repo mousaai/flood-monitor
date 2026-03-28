@@ -125,12 +125,21 @@ function isInArabianGulf(lat: number, lng: number): boolean {
  * Returns true if [lat, lng] is inside the Abu Dhabi emirate LAND boundary.
  * Excludes Arabian Gulf territorial waters.
  */
+// Performance cache for isInsideAbuDhabi — rounded to 3 decimal places (~100m grid)
+const _boundaryCache = new Map<string, boolean>();
 export function isInsideAbuDhabi(lat: number, lng: number): boolean {
-  // Quick bounding box check
+  // Quick bounding box check (no cache needed — very fast)
   if (lat < 22.5 || lat > 25.5 || lng < 51.3 || lng > 56.1) return false;
 
+  const key = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+  const cached = _boundaryCache.get(key);
+  if (cached !== undefined) return cached;
+
   // Exclude Arabian Gulf waters
-  if (isInArabianGulf(lat, lng)) return false;
+  if (isInArabianGulf(lat, lng)) {
+    _boundaryCache.set(key, false);
+    return false;
+  }
 
   const poly = AD_EMIRATE_BOUNDARY;
   let inside = false;
@@ -149,6 +158,12 @@ export function isInsideAbuDhabi(lat: number, lng: number): boolean {
     j = i;
   }
 
+  // Evict oldest entries if cache grows too large
+  if (_boundaryCache.size > 8192) {
+    const firstKey = _boundaryCache.keys().next().value;
+    if (firstKey !== undefined) _boundaryCache.delete(firstKey);
+  }
+  _boundaryCache.set(key, inside);
   return inside;
 }
 
@@ -233,8 +248,15 @@ export const URBAN_ZONES: UrbanZone[] = [
  * Get urban density for a given lat/lng.
  * Returns 0.0 if the point is not in any known urban zone.
  * Returns the highest density if the point is in multiple overlapping zones.
+ *
+ * Performance: LRU-style cache with 4096 entries (rounded to 3 decimal places).
+ * This avoids repeated linear scans of URBAN_ZONES for the same grid points.
  */
+const _densityCache = new Map<string, number>();
 export function getUrbanDensity(lat: number, lng: number): number {
+  const key = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+  const cached = _densityCache.get(key);
+  if (cached !== undefined) return cached;
   let maxDensity = 0.0;
   for (const zone of URBAN_ZONES) {
     if (
@@ -244,5 +266,11 @@ export function getUrbanDensity(lat: number, lng: number): number {
       if (zone.density > maxDensity) maxDensity = zone.density;
     }
   }
+  // Evict oldest entries if cache grows too large
+  if (_densityCache.size > 4096) {
+    const firstKey = _densityCache.keys().next().value;
+    if (firstKey !== undefined) _densityCache.delete(firstKey);
+  }
+  _densityCache.set(key, maxDensity);
   return maxDensity;
 }

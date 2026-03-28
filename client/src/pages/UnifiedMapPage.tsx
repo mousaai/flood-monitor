@@ -390,7 +390,20 @@ export default function UnifiedMapPage() {
     const L = (window as any).L;
     if (!L) return;
 
-    const map = L.map(mapRef.current, { zoomControl: false, attributionControl: true, center: [24.45, 54.37], zoom: 10 });
+    const map = L.map(mapRef.current, {
+      zoomControl: false,
+      attributionControl: true,
+      center: [24.45, 54.37],
+      zoom: 10,
+      // Performance optimizations
+      preferCanvas: true,           // Use Canvas renderer instead of SVG (much faster)
+      zoomSnap: 0.5,                // Smoother zoom steps
+      zoomDelta: 0.5,               // Smaller zoom increments
+      wheelDebounceTime: 40,        // Debounce scroll wheel (ms)
+      wheelPxPerZoomLevel: 120,     // Require more scroll to zoom (reduces accidental zoom)
+      fadeAnimation: false,         // Disable fade animation (faster)
+      markerZoomAnimation: false,   // Disable marker zoom animation
+    });
     leafletMapRef.current = map;
     // Signal that map is ready for overlay layers
     setMapReady(true);
@@ -398,9 +411,13 @@ export default function UnifiedMapPage() {
     // Base tile layer
     const darkTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: 'OpenStreetMap | Open-Meteo | Copernicus CEMS ©', maxZoom: 19, subdomains: 'abcd',
+      updateWhenIdle: true,         // Only update tiles when map stops moving
+      keepBuffer: 2,                // Keep 2 tiles outside viewport
     });
     const satelliteTile = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       attribution: 'Esri World Imagery', maxZoom: 19,
+      updateWhenIdle: true,
+      keepBuffer: 2,
     });
     // Default to satellite (aerial photo view)
     satelliteTile.addTo(map);
