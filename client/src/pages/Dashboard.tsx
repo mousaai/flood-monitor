@@ -385,8 +385,12 @@ export default function Dashboard() {
             color={summary.criticalCount > 0 ? '#EF4444' : summary.warningCount > 0 ? '#FF6B35' : GEO.amber}
             sublabel={`${summary.criticalCount} ${lang === 'ar' ? 'حرجة' : 'CRIT'} · ${summary.warningCount} ${lang === 'ar' ? 'تحذير' : 'WARN'} · ${summary.watchCount} ${lang === 'ar' ? 'مراقبة' : 'WATCH'}`} pulse
             tooltip={TOOLTIPS.activeAlerts} onClick={() => openDrillDown('alerts')} explainerId="activeAlerts" />
-          <KPICard icon={Droplets} label={t('dashboard.maxRainfall')} value={summary.totalPrecip} unit="mm"
-            color={GEO.blue} sublabel={t('dashboard.peakRegion')} pulse
+          <KPICard icon={Droplets}
+            label={summary.isRainActive ? (lang === 'ar' ? 'هطول فعلي الآن' : 'Active Rain Now') : t('dashboard.maxRainfall')}
+            value={summary.totalPrecip} unit="mm"
+            color={summary.isRainActive ? GEO.red : GEO.blue}
+            sublabel={summary.isRainActive ? (lang === 'ar' ? 'معدل الساعة الحالية' : 'Current Rate mm/hr') : (lang === 'ar' ? `إجمالي 24ساعة: ${summary.maxTotalPrecip}mm` : `24h Total: ${summary.maxTotalPrecip}mm`)}
+            pulse={summary.isRainActive}
             tooltip={TOOLTIPS.precipitation24h} onClick={() => openDrillDown('precipitation')} explainerId="maxRainfall24h" />
           <KPICard icon={Thermometer} label={t('dashboard.avgTemp')} value={summary.avgTemp} unit="°C"
             color={GEO.amber} sublabel={t('dashboard.avgAbuDhabi')} pulse

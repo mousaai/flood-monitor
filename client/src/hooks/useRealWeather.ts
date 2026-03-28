@@ -106,8 +106,12 @@ export function computeWeatherSummary(data: ExtendedSystemWeatherData | null) {
   const warningCount = regions.filter(r => r.alertLevel === 'warning').length;
   const watchCount = regions.filter(r => r.alertLevel === 'watch').length;
 
-  // Use max rainfall across all regions (most meaningful for flood monitoring)
-  const totalPrecip = Math.max(...regions.map(r => r.totalLast24h));
+  // Use max CURRENT precipitation (last 15-min reading) for immediate flood monitoring
+  // Falls back to max 24h if no current rain, but shows it as historical context
+  const maxCurrentPrecip = Math.max(...regions.map(r => r.currentPrecipitation));
+  const maxTotalPrecip = Math.max(...regions.map(r => r.totalLast24h));
+  // Show current rain if active, otherwise show 24h total as context
+  const totalPrecip = maxCurrentPrecip > 0 ? maxCurrentPrecip : maxTotalPrecip;
   const maxRisk = Math.max(...regions.map(r => r.floodRisk));
   const avgTemp = regions.reduce((sum, r) => sum + r.currentTemperature, 0) / regions.length;
 
@@ -165,6 +169,8 @@ export function computeWeatherSummary(data: ExtendedSystemWeatherData | null) {
     warningCount,
     watchCount,
     totalPrecip: Math.round(totalPrecip * 10) / 10,
+    maxTotalPrecip: Math.round(maxTotalPrecip * 10) / 10,  // 24h context
+    isRainActive: maxCurrentPrecip > 0,  // true if any region has active rain now
     maxRisk,
     avgTemp: Math.round(avgTemp * 10) / 10,
     highestRiskRegion,

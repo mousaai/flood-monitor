@@ -64,7 +64,8 @@ function computeFloodRisk(
   currentPrecip: number,
   total24h: number,
   maxNext48h: number,
-  probability: number
+  probability: number,
+  total6h: number = 0  // Recent 6-hour accumulation — primary soil saturation signal
 ): number {
   // UAE desert soil infiltration capacity ~2 mm/h — any active rain triggers runoff risk
   //
@@ -77,13 +78,20 @@ function computeFloodRisk(
     currentPrecip < 7    ? 30 + (currentPrecip - 3) * 5 :             // moderate: 30–50
                            Math.min(50 + (currentPrecip - 7) * 3, 65); // heavy: 50–65
 
-  // 2. Accumulation load — desert soil saturates quickly (low permeability)
-  const accumScore =
-    total24h <= 0  ? 0 :
-    total24h < 5   ? total24h * 2.5 :                                  // 0–12.5
-    total24h < 15  ? 12.5 + (total24h - 5) * 1.5 :                    // 12.5–27.5
-    total24h < 30  ? 27.5 + (total24h - 15) * 0.8 :                   // 27.5–39.5
-                     Math.min(39.5 + (total24h - 30) * 0.2, 45);      // plateau at 45
+  // 2. Recent accumulation load (last 6h) — primary soil saturation signal
+  //    Decays quickly when rain stops — reflects current ground conditions
+  const recentAccumScore =
+    total6h <= 0  ? 0 :
+    total6h < 2   ? total6h * 4 :                                      // 0–8
+    total6h < 8   ? 8 + (total6h - 2) * 2.5 :                         // 8–23
+    total6h < 20  ? 23 + (total6h - 8) * 1.0 :                        // 23–35
+                    Math.min(35 + (total6h - 20) * 0.3, 40);          // plateau at 40
+
+  // 2b. Historical 24h context — reduced weight (background soil moisture only)
+  //     Only contributes if there was significant recent rain (within 6h)
+  const historicalBonus = total6h > 0
+    ? Math.min((total24h - total6h) * 0.05, 8)   // max 8 pts from old rain
+    : Math.min((total24h) * 0.03, 5);             // minimal residual if no recent rain
 
   // 3. Forecast pressure — forward-looking risk (next 48h max)
   const forecastScore = Math.min(maxNext48h * 2.0, 28);
@@ -95,18 +103,18 @@ function computeFloodRisk(
   const interactionBonus =
     currentPrecip >= 1 && probability >= 50
       ? Math.min(currentPrecip * (probability / 100) * 1.5, 12)
-      : currentPrecip >= 3 && total24h >= 5
-        ? Math.min((currentPrecip - 3) * (total24h - 5) * 0.1, 8)
+      : currentPrecip >= 3 && total6h >= 5
+        ? Math.min((currentPrecip - 3) * (total6h - 5) * 0.1, 8)
         : 0;
 
-  const raw = intensityScore + accumScore + forecastScore + probScore + interactionBonus;
+  const raw = intensityScore + recentAccumScore + historicalBonus + forecastScore + probScore + interactionBonus;
   return Math.min(Math.round(raw), 100);
 }
 
 function getAlertLevel(risk: number): RegionWeather['alertLevel'] {
-  if (risk >= 65) return 'critical';  // Extreme — immediate danger, evacuate low-lying areas
-  if (risk >= 40) return 'warning';   // High — active rainfall, road flooding likely
-  if (risk >= 20) return 'watch';     // Elevated — monitoring required, be prepared
+  if (risk >= 70) return 'critical';  // Extreme — immediate danger, active heavy rain
+  if (risk >= 50) return 'warning';   // High — active rainfall, road flooding likely
+  if (risk >= 30) return 'watch';     // Elevated — monitoring required, rain expected
   return 'safe';
 }
 
@@ -239,10 +247,13 @@ export async function fetchAllRegionsWeatherServer(): Promise<SystemWeatherData>
 
       const past24h = hourly.precipitation.slice(0, idx);
       const total24h = past24h.reduce((s: number, v: number) => s + (v || 0), 0);
+      // Recent 6-hour accumulation — primary signal for current ground conditions
+      const past6h = hourly.precipitation.slice(Math.max(0, idx - 6), idx);
+      const total6h = past6h.reduce((s: number, v: number) => s + (v || 0), 0);
       const next48h = hourly.precipitation.slice(idx, idx + 48);
       const maxNext48h = Math.max(0, ...next48h.map((v: number) => v || 0));
       const currentProb = current.precipitation_probability || hourly.precipitation_probability[idx] || 0;
-      const floodRisk = computeFloodRisk(effectivePrecip, total24h, maxNext48h, currentProb);
+      const floodRisk = computeFloodRisk(effectivePrecip, total24h, maxNext48h, currentProb, total6h);
 
       allRegions.push({
         id: r.id, nameAr: r.nameAr, nameEn: r.nameEn, lat: r.lat, lon: r.lon,
