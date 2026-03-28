@@ -381,9 +381,15 @@ export default function Dashboard() {
       {/* ── KPI Cards ───────────────────────────────────────────────────────── */}
       {summary && (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? '8px' : '12px' }}>
-          <KPICard icon={AlertTriangle} label={t('dashboard.activeAlerts')} value={summary.activeAlerts} unit={t('common.alert')}
-            color={summary.criticalCount > 0 ? '#EF4444' : summary.warningCount > 0 ? '#FF6B35' : GEO.amber}
-            sublabel={`${summary.criticalCount} ${lang === 'ar' ? 'حرجة' : 'CRIT'} · ${summary.warningCount} ${lang === 'ar' ? 'تحذير' : 'WARN'} · ${summary.watchCount} ${lang === 'ar' ? 'مراقبة' : 'WATCH'}`} pulse
+          <KPICard icon={AlertTriangle}
+            label={summary.activeAlerts > 0 ? (lang === 'ar' ? 'تنبيهات نشطة الآن' : 'Active Alerts Now') : (lang === 'ar' ? 'لا تنبيهات نشطة' : 'No Active Alerts')}
+            value={summary.activeAlerts} unit={t('common.alert')}
+            color={summary.criticalCount > 0 ? '#EF4444' : summary.warningCount > 0 ? '#FF6B35' : summary.activeAlerts > 0 ? GEO.amber : GEO.green}
+            sublabel={
+              summary.activeAlerts > 0
+                ? `${summary.criticalCount} ${lang === 'ar' ? 'حرجة' : 'CRIT'} · ${summary.warningCount} ${lang === 'ar' ? 'تحذير' : 'WARN'} · ${summary.watchCount} ${lang === 'ar' ? 'مراقبة' : 'WATCH'}`
+                : lang === 'ar' ? '✅ الوضع الراهن: آمن' : '✅ Current status: Safe'
+            } pulse={summary.activeAlerts > 0}
             tooltip={TOOLTIPS.activeAlerts} onClick={() => openDrillDown('alerts')} explainerId="activeAlerts" />
           <KPICard icon={Droplets}
             label={summary.isRainActive ? (lang === 'ar' ? 'هطول فعلي الآن' : 'Active Rain Now') : t('dashboard.maxRainfall')}
