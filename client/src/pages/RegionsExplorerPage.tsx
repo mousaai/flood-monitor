@@ -3,7 +3,7 @@
  * Data: 100% live from Open-Meteo via useLiveRegions hook
  * Historical: ERA5 archive up to 90 days | Forecast: 16-day forecast
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useIsMobile } from '@/hooks/useMobile';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
@@ -15,6 +15,7 @@ import {
   MapPin, Droplets, AlertTriangle, Thermometer, Wind, Activity,
   ArrowUpRight, Building2, TrendingUp, Waves, Navigation,
   RefreshCw, Clock, BarChart2, Calendar, Search,
+  Zap, Recycle, Shield, ChevronDown, ChevronUp, Globe, DollarSign, Leaf,
 } from 'lucide-react';
 import { alertColor, alertLabel, type AlertLevel } from '@/data/abuDhabiRegions';
 import { useLiveRegions, type LiveSubArea, type LiveCity } from '@/hooks/useLiveRegions';
@@ -513,6 +514,338 @@ function CityView({ city, onSelectArea }: { city: LiveCity; onSelectArea: (area:
   );
 }
 
+// ── Mini Map Component ───────────────────────────────────────────────────────
+function SubAreaMiniMap({ area, isAr, navigate }: { area: LiveSubArea; isAr: boolean; navigate: (path: string) => void }) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const depth = area.waterAccumulation?.estimatedDepthCm ?? area.maxWaterDepthCm;
+  const floodAreaKm2 = area.waterAccumulation?.estimatedAreaKm2 ?? (area.floodAreaHa / 100);
+  const volumeMCM = ((depth / 100) * floodAreaKm2).toFixed(3);
+  const depthColor = depth >= 100 ? '#EF4444' : depth >= 50 ? '#F59E0B' : depth >= 20 ? '#42A5F5' : '#66BB6A';
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const container = mapRef.current;
+    container.innerHTML = '';
+    const delta = area.areaSqKm > 500 ? 0.25 : area.areaSqKm > 100 ? 0.15 : 0.08;
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'width:100%;height:100%;border:none;border-radius:6px;';
+    iframe.src = `https://www.openstreetmap.org/export/embed.html?bbox=${area.lng - delta},${area.lat - delta * 0.7},${area.lng + delta},${area.lat + delta * 0.7}&layer=mapnik&marker=${area.lat},${area.lng}`;
+    container.appendChild(iframe);
+  }, [area.lat, area.lng, area.areaSqKm]);
+
+  return (
+    <div style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: '4px', padding: '14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <h3 style={{ fontFamily: T.fontHead, fontSize: '12px', fontWeight: 600, color: T.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <MapPin size={13} style={{ color: T.blue }} />
+          {isAr ? 'خارطة المنطقة — مساحة وعمق وحجم المياه' : 'Region Map — Water Area, Depth & Volume'}
+        </h3>
+        <button onClick={() => navigate(`/map?lat=${area.lat}&lng=${area.lng}&zoom=13`)}
+          style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', background: 'rgba(66,165,245,0.1)', border: '1px solid rgba(66,165,245,0.3)', borderRadius: '3px', cursor: 'pointer', color: T.blue, fontSize: '10px', fontFamily: T.fontMono }}>
+          <ArrowUpRight size={10} /> {isAr ? 'فتح في الخارطة الرئيسية' : 'Open in Main Map'}
+        </button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px', gap: '12px' }}>
+        <div ref={mapRef} style={{ height: '220px', borderRadius: '6px', background: '#0a1525', overflow: 'hidden', border: '1px solid rgba(66,165,245,0.15)' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ background: `${depthColor}12`, border: `1px solid ${depthColor}30`, borderRadius: '4px', padding: '10px', textAlign: 'center' }}>
+            <div style={{ fontSize: '9px', color: T.textMuted, fontFamily: T.fontMono, marginBottom: '4px' }}>{isAr ? 'أقصى عمق' : 'Max Depth'}</div>
+            <div style={{ fontSize: '28px', fontWeight: 800, color: depthColor, fontFamily: T.fontMono, lineHeight: 1 }}>{depth}</div>
+            <div style={{ fontSize: '10px', color: T.textMuted, fontFamily: T.fontMono }}>cm</div>
+          </div>
+          <div style={{ background: 'rgba(66,165,245,0.08)', border: '1px solid rgba(66,165,245,0.2)', borderRadius: '4px', padding: '10px', textAlign: 'center' }}>
+            <div style={{ fontSize: '9px', color: T.textMuted, fontFamily: T.fontMono, marginBottom: '4px' }}>{isAr ? 'مساحة الفيضان' : 'Flood Area'}</div>
+            <div style={{ fontSize: '22px', fontWeight: 800, color: T.blue, fontFamily: T.fontMono, lineHeight: 1 }}>{floodAreaKm2.toFixed(1)}</div>
+            <div style={{ fontSize: '10px', color: T.textMuted, fontFamily: T.fontMono }}>km²</div>
+          </div>
+          <div style={{ background: 'rgba(102,187,106,0.08)', border: '1px solid rgba(102,187,106,0.2)', borderRadius: '4px', padding: '10px', textAlign: 'center' }}>
+            <div style={{ fontSize: '9px', color: T.textMuted, fontFamily: T.fontMono, marginBottom: '4px' }}>{isAr ? 'حجم المياه' : 'Water Volume'}</div>
+            <div style={{ fontSize: '22px', fontWeight: 800, color: T.green, fontFamily: T.fontMono, lineHeight: 1 }}>{volumeMCM}</div>
+            <div style={{ fontSize: '10px', color: T.textMuted, fontFamily: T.fontMono }}>MCM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Solution Scenarios ─────────────────────────────────────────────────────────
+function SubAreaSolutions({ area, isAr }: { area: LiveSubArea; isAr: boolean }) {
+  const [activeScenario, setActiveScenario] = useState<'quick' | 'medium' | 'comprehensive'>('medium');
+
+  const scenarios = useMemo(() => {
+    const areaSqKm = area.areaSqKm;
+    const depth = area.waterAccumulation?.estimatedDepthCm ?? area.maxWaterDepthCm;
+    const type = (area as any).type ?? 'residential';
+    const baseCostPerKm2 = type === 'commercial' ? 2.5 : type === 'industrial' ? 2.0 : type === 'airport' ? 3.5 : 1.5;
+    const scale = Math.min(areaSqKm, 50);
+    return [
+      {
+        id: 'quick' as const,
+        label: isAr ? 'استجابة سريعة' : 'Quick Response',
+        timeframe: isAr ? '1–7 أيام' : '1–7 days',
+        color: '#F59E0B',
+        icon: '⚡',
+        costMin: Math.round(scale * baseCostPerKm2 * 0.1),
+        costMax: Math.round(scale * baseCostPerKm2 * 0.3),
+        solutions: [
+          isAr ? 'نشر مضخات مياه محمولة (سعة 500–2000 م³/ساعة)' : 'Deploy mobile pumps (500–2,000 m³/hr capacity)',
+          isAr ? 'حواجز مؤقتة لتحويل مسار المياه' : 'Temporary flood barriers to redirect water flow',
+          isAr ? 'تنظيف مداخل الصرف المسدودة' : 'Clear blocked drainage inlets',
+          isAr ? 'تحذيرات إخلاء للمناطق المنخفضة' : 'Evacuation warnings for low-lying zones',
+        ],
+        globalRef: isAr ? 'دبي 2024: نشر 200 مضخة خلال 6 ساعات' : 'Dubai 2024: 200 pumps deployed within 6 hours',
+        reduction: '40–60%',
+      },
+      {
+        id: 'medium' as const,
+        label: isAr ? 'حل متوسط المدى' : 'Medium-Term Solution',
+        timeframe: isAr ? '3–12 شهر' : '3–12 months',
+        color: '#42A5F5',
+        icon: '🔧',
+        costMin: Math.round(scale * baseCostPerKm2 * 0.8),
+        costMax: Math.round(scale * baseCostPerKm2 * 2.0),
+        solutions: [
+          isAr ? `توسعة شبكة الصرف بسعة ${Math.round(depth * 0.5)} م³/ثانية` : `Expand drainage network by ${Math.round(depth * 0.5)} m³/s`,
+          isAr ? 'إنشاء خزانات احتجاز مياه أمطار تحت الأرض' : 'Underground stormwater retention tanks',
+          isAr ? 'تحسين انحدار الطرق وتوجيه المياه للأودية' : 'Road re-grading to direct water to wadis',
+          isAr ? 'تركيب بوابات تحكم ذكية في نقاط الصرف' : 'Smart control gates at drainage outlets',
+          isAr ? 'تحسين الغطاء النباتي لامتصاص المياه' : 'Vegetation enhancement for water absorption',
+        ],
+        globalRef: isAr ? 'سنغافورة: نفق ABC Waters يخزن 280,000 م³' : 'Singapore ABC Waters tunnel stores 280,000 m³',
+        reduction: '65–80%',
+      },
+      {
+        id: 'comprehensive' as const,
+        label: isAr ? 'حل شامل ودائم' : 'Comprehensive Solution',
+        timeframe: isAr ? '2–5 سنوات' : '2–5 years',
+        color: '#66BB6A',
+        icon: '🏗️',
+        costMin: Math.round(scale * baseCostPerKm2 * 3.0),
+        costMax: Math.round(scale * baseCostPerKm2 * 8.0),
+        solutions: [
+          isAr ? 'إعادة تصميم شبكة الصرف وفق معايير 100 سنة' : 'Full drainage redesign to 100-year flood standard',
+          isAr ? 'إنشاء مناطق تخضير وأحواض ترسيب طبيعية' : 'Green infrastructure & natural sedimentation basins',
+          isAr ? 'نظام تحكم مركزي ذكي لإدارة المياه' : 'Centralized smart water management system',
+          isAr ? 'خزانات تخزين مياه الأمطار للاستخدام المزدوج' : 'Dual-use stormwater storage reservoirs',
+          isAr ? 'تطوير أراضٍ رطبة صناعية لتصفية وتخزين المياه' : 'Constructed wetlands for treatment & storage',
+          isAr ? 'تحسين نفاذية الأسطح الحضرية (رصف مسامي)' : 'Permeable pavement & urban surface permeability',
+        ],
+        globalRef: isAr ? 'هولندا Room for the River: خفض الفيضانات 90%' : "Netherlands 'Room for the River': 90% flood reduction",
+        reduction: '85–95%',
+      },
+    ];
+  }, [area, isAr]);
+
+  const selected = scenarios.find(s => s.id === activeScenario)!;
+
+  return (
+    <div style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: '4px', padding: '14px' }}>
+      <h3 style={{ fontFamily: T.fontHead, fontSize: '12px', fontWeight: 600, color: T.text, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Zap size={13} style={{ color: T.yellow }} />
+        {isAr ? 'سيناريوهات الحلول والتكاليف التقديرية' : 'Solution Scenarios & Estimated Costs'}
+      </h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
+        {scenarios.map(s => (
+          <button key={s.id} onClick={() => setActiveScenario(s.id)} style={{
+            padding: '10px 8px', borderRadius: '6px', border: `2px solid ${activeScenario === s.id ? s.color : s.color + '33'}`,
+            background: activeScenario === s.id ? `${s.color}15` : 'rgba(255,255,255,0.02)',
+            cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
+          }}>
+            <div style={{ fontSize: '18px', marginBottom: '4px' }}>{s.icon}</div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: activeScenario === s.id ? s.color : T.textMuted, fontFamily: T.fontMono }}>{s.label}</div>
+            <div style={{ fontSize: '9px', color: T.textMuted, fontFamily: T.fontMono, marginTop: '2px' }}>{s.timeframe}</div>
+          </button>
+        ))}
+      </div>
+      <div style={{ background: `${selected.color}08`, borderRadius: '8px', padding: '14px', border: `1px solid ${selected.color}22` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <DollarSign size={14} style={{ color: selected.color }} />
+            <span style={{ fontSize: '11px', color: T.textSub, fontFamily: T.fontMono }}>{isAr ? 'التكلفة التقديرية:' : 'Estimated Cost:'}</span>
+            <span style={{ fontSize: '14px', fontWeight: 700, color: selected.color, fontFamily: T.fontMono }}>AED {selected.costMin}M – {selected.costMax}M</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: `${selected.color}15`, padding: '4px 10px', borderRadius: '20px' }}>
+            <TrendingUp size={11} style={{ color: selected.color }} />
+            <span style={{ fontSize: '10px', color: selected.color, fontFamily: T.fontMono, fontWeight: 700 }}>
+              {isAr ? `تخفيض الخطر: ${selected.reduction}` : `Risk Reduction: ${selected.reduction}`}
+            </span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+          {selected.solutions.map((sol, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: `${selected.color}20`, border: `1px solid ${selected.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                <span style={{ fontSize: '9px', color: selected.color, fontFamily: T.fontMono, fontWeight: 700 }}>{i + 1}</span>
+              </div>
+              <span style={{ fontSize: '11px', color: T.textSub, fontFamily: T.fontMono, lineHeight: 1.5 }}>{sol}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <Globe size={11} style={{ color: T.blue, flexShrink: 0, marginTop: '2px' }} />
+          <span style={{ fontSize: '10px', color: T.textMuted, fontFamily: T.fontMono, lineHeight: 1.5 }}>
+            <span style={{ color: T.blue, fontWeight: 600 }}>{isAr ? 'مرجع عالمي: ' : 'Global Reference: '}</span>
+            {selected.globalRef}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Water Reuse ────────────────────────────────────────────────────────────────
+function SubAreaWaterReuse({ area, isAr }: { area: LiveSubArea; isAr: boolean }) {
+  const depth = area.waterAccumulation?.estimatedDepthCm ?? area.maxWaterDepthCm;
+  const floodAreaKm2 = area.waterAccumulation?.estimatedAreaKm2 ?? (area.floodAreaHa / 100);
+  const volumeMCM = (depth / 100) * floodAreaKm2;
+  const type = (area as any).type ?? 'residential';
+
+  const reuseApps = useMemo(() => [
+    {
+      icon: '🌿', label: isAr ? 'ري المساحات الخضراء' : 'Landscape Irrigation',
+      volume: (volumeMCM * 0.35).toFixed(3), saving: Math.round(volumeMCM * 0.35 * 1000 * 3.5),
+      desc: isAr ? 'ري الحدائق والمسطحات الخضراء والشوارع المشجرة' : 'Parks, green belts & tree-lined streets',
+      globalRef: isAr ? 'أبوظبي: إعادة استخدام 100% من المياه المعالجة للري' : 'Abu Dhabi: 100% treated water reuse for irrigation',
+      feasibility: 'high',
+    },
+    {
+      icon: '🏗️', label: isAr ? 'مياه البناء والإنشاء' : 'Construction Water',
+      volume: (volumeMCM * 0.25).toFixed(3), saving: Math.round(volumeMCM * 0.25 * 1000 * 4.0),
+      desc: isAr ? 'خلط الخرسانة وسقي التربة وتثبيت الغبار' : 'Concrete mixing, soil compaction & dust suppression',
+      globalRef: isAr ? 'دبي Expo 2020: 40% من مياه البناء معاد تدويرها' : 'Dubai Expo 2020: 40% construction water recycled',
+      feasibility: 'high',
+    },
+    {
+      icon: '✈️', label: isAr ? 'عمليات المطار' : 'Airport Operations',
+      volume: (volumeMCM * 0.15).toFixed(3), saving: Math.round(volumeMCM * 0.15 * 1000 * 5.5),
+      desc: isAr ? 'غسيل الطائرات وتبريد المدارج وصهاريج الإطفاء' : 'Aircraft washing, runway cooling & fire suppression',
+      globalRef: isAr ? 'مطار سنغافورة: توفير 2.5 مليون م³/سنة' : 'Singapore Changi: 2.5M m³/year stormwater savings',
+      feasibility: type === 'airport' ? 'high' : 'medium',
+    },
+    {
+      icon: '💧', label: isAr ? 'تغذية المياه الجوفية' : 'Groundwater Recharge',
+      volume: (volumeMCM * 0.20).toFixed(3), saving: Math.round(volumeMCM * 0.20 * 1000 * 2.0),
+      desc: isAr ? 'حقن المياه في طبقات المياه الجوفية عبر آبار الحقن' : 'Aquifer injection via recharge wells',
+      globalRef: isAr ? 'الإمارات: مشروع تغذية المياه الجوفية في العين — 50 مليون م³/سنة' : 'UAE Al Ain MAR project: 50M m³/year recharge',
+      feasibility: 'medium',
+    },
+    {
+      icon: '🏭', label: isAr ? 'التبريد الصناعي' : 'Industrial Cooling',
+      volume: (volumeMCM * 0.05).toFixed(3), saving: Math.round(volumeMCM * 0.05 * 1000 * 6.0),
+      desc: isAr ? 'تبريد المحطات الكهربائية والمصانع' : 'Power plants, factories & commercial cooling',
+      globalRef: isAr ? 'أبوظبي: نظام التبريد المركزي يوفر 40% طاقة' : 'Abu Dhabi district cooling: 40% energy saving',
+      feasibility: type === 'industrial' ? 'high' : 'low',
+    },
+  ], [volumeMCM, type, isAr]);
+
+  const totalSaving = reuseApps.reduce((s, a) => s + a.saving, 0);
+  const feasibilityColor = (f: string) => f === 'high' ? T.green : f === 'medium' ? T.yellow : T.textMuted;
+
+  return (
+    <div style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: '4px', padding: '14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+        <h3 style={{ fontFamily: T.fontHead, fontSize: '12px', fontWeight: 600, color: T.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Recycle size={13} style={{ color: T.green }} />
+          {isAr ? 'إعادة استخدام مياه الفيضان' : 'Floodwater Reuse Applications'}
+        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(102,187,106,0.1)', padding: '4px 10px', borderRadius: '20px', border: '1px solid rgba(102,187,106,0.3)' }}>
+          <DollarSign size={11} style={{ color: T.green }} />
+          <span style={{ fontSize: '10px', color: T.green, fontFamily: T.fontMono, fontWeight: 700 }}>
+            {isAr ? `إجمالي الوفر: AED ${(totalSaving / 1000).toFixed(0)}K` : `Total Saving: AED ${(totalSaving / 1000).toFixed(0)}K`}
+          </span>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {reuseApps.map((app, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '28px 1fr auto', gap: '10px', alignItems: 'start', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ fontSize: '18px', lineHeight: 1.4 }}>{app.icon}</div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: T.text, fontFamily: T.fontHead }}>{app.label}</span>
+                <span style={{ fontSize: '9px', color: feasibilityColor(app.feasibility), fontFamily: T.fontMono, background: `${feasibilityColor(app.feasibility)}15`, padding: '1px 6px', borderRadius: '10px' }}>
+                  {app.feasibility === 'high' ? (isAr ? 'جدوى عالية' : 'High') : app.feasibility === 'medium' ? (isAr ? 'متوسط' : 'Medium') : (isAr ? 'منخفض' : 'Low')}
+                </span>
+              </div>
+              <div style={{ fontSize: '10px', color: T.textMuted, fontFamily: T.fontMono, marginBottom: '4px' }}>{app.desc}</div>
+              <div style={{ fontSize: '9px', color: T.blue, fontFamily: T.fontMono }}><Globe size={9} style={{ display: 'inline', marginRight: '3px' }} />{app.globalRef}</div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: T.green, fontFamily: T.fontMono }}>{app.volume} MCM</div>
+              <div style={{ fontSize: '9px', color: T.textMuted, fontFamily: T.fontMono }}>AED {(app.saving / 1000).toFixed(0)}K</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Prevention & Best Practices ────────────────────────────────────────────────
+function SubAreaPrevention({ area: _area, isAr }: { area: LiveSubArea; isAr: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const practices = [
+    {
+      icon: '🌊', title: isAr ? 'البنية التحتية الخضراء (GI)' : 'Green Infrastructure (GI)',
+      desc: isAr ? 'الأسطح الخضراء، الحدائق المطرية، الأرصفة المسامية — تخفض الجريان السطحي 20–40%' : 'Green roofs, rain gardens, permeable pavements — reduce runoff 20–40%',
+      impact: isAr ? 'متوسط–عالي' : 'Medium–High', cost: isAr ? 'منخفض' : 'Low',
+      ref: isAr ? 'نيويورك: برنامج GI وفّر $1.5 مليار مقارنة بالبنية التقليدية' : 'NYC GI program saved $1.5B vs. conventional infrastructure',
+    },
+    {
+      icon: '🏙️', title: isAr ? 'مدينة الإسفنج (Sponge City)' : 'Sponge City Concept',
+      desc: isAr ? 'تصميم المدينة لامتصاص 70% من مياه الأمطار محلياً عبر مناطق ترشيح طبيعية' : 'Design cities to absorb 70% of rainfall locally via natural filtration zones',
+      impact: isAr ? 'عالي جداً' : 'Very High', cost: isAr ? 'متوسط' : 'Medium',
+      ref: isAr ? 'الصين: 30 مدينة إسفنجية — خفض الفيضانات 80%' : 'China: 30 sponge cities — 80% flood reduction',
+    },
+    {
+      icon: '📡', title: isAr ? 'الإنذار المبكر الذكي' : 'Smart Early Warning System',
+      desc: isAr ? 'شبكة مستشعرات IoT + نماذج AI تنبؤية تُنذر قبل 6–12 ساعة من الفيضان' : 'IoT sensor network + AI predictive models — 6–12 hour flood warning',
+      impact: isAr ? 'عالي (إنقاذ أرواح)' : 'High (life-saving)', cost: isAr ? 'منخفض–متوسط' : 'Low–Medium',
+      ref: isAr ? 'هولندا: نظام Flood EWS يغطي 17 مليون شخص بدقة 95%' : 'Netherlands Flood EWS: covers 17M people with 95% accuracy',
+    },
+    {
+      icon: '🌿', title: isAr ? 'استعادة الأودية الطبيعية' : 'Wadi Restoration',
+      desc: isAr ? 'إزالة التعديات على مجاري الأودية وتوسيعها لاستيعاب تدفقات الفيضانات الكبرى' : 'Remove encroachments on wadi channels & widen for major flood flows',
+      impact: isAr ? 'عالي جداً' : 'Very High', cost: isAr ? 'متوسط' : 'Medium',
+      ref: isAr ? 'الإمارات: مشروع أودية الفجيرة خفض الفيضانات 75% في 2024' : 'UAE Fujairah Wadi Project: 75% flood reduction in 2024',
+    },
+    {
+      icon: '🗺️', title: isAr ? 'تخطيط استخدام الأراضي' : 'Land Use Planning',
+      desc: isAr ? 'منع البناء في مناطق الفيضان المئوية وتحديد مناطق عازلة طبيعية' : 'Prohibit construction in 100-year floodplains & designate buffer zones',
+      impact: isAr ? 'عالي (وقاية طويلة المدى)' : 'High (long-term prevention)', cost: isAr ? 'منخفض' : 'Low',
+      ref: isAr ? 'سنغافورة: خرائط الفيضان تُلزم كل مشروع بمراجعة مخاطر الفيضان' : 'Singapore: flood maps mandate flood risk review for all projects',
+    },
+  ];
+  const visiblePractices = expanded ? practices : practices.slice(0, 3);
+  return (
+    <div style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: '4px', padding: '14px' }}>
+      <h3 style={{ fontFamily: T.fontHead, fontSize: '12px', fontWeight: 600, color: T.text, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Shield size={13} style={{ color: T.blue }} />
+        {isAr ? 'أفضل الممارسات العالمية — الوقاية من التكرار' : 'Global Best Practices — Preventing Recurrence'}
+      </h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {visiblePractices.map((p, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '28px 1fr', gap: '10px', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ fontSize: '18px', lineHeight: 1.4 }}>{p.icon}</div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: T.text, fontFamily: T.fontHead }}>{p.title}</span>
+                <span style={{ fontSize: '9px', color: T.green, fontFamily: T.fontMono, background: 'rgba(102,187,106,0.1)', padding: '1px 6px', borderRadius: '10px' }}>{isAr ? 'التأثير: ' : 'Impact: '}{p.impact}</span>
+                <span style={{ fontSize: '9px', color: T.yellow, fontFamily: T.fontMono, background: 'rgba(245,158,11,0.1)', padding: '1px 6px', borderRadius: '10px' }}>{isAr ? 'التكلفة: ' : 'Cost: '}{p.cost}</span>
+              </div>
+              <div style={{ fontSize: '10px', color: T.textMuted, fontFamily: T.fontMono, marginBottom: '4px', lineHeight: 1.5 }}>{p.desc}</div>
+              <div style={{ fontSize: '9px', color: T.blue, fontFamily: T.fontMono }}><Globe size={9} style={{ display: 'inline', marginRight: '3px' }} />{p.ref}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <button onClick={() => setExpanded(!expanded)} style={{ marginTop: '10px', width: '100%', padding: '8px', background: 'rgba(66,165,245,0.06)', border: '1px solid rgba(66,165,245,0.2)', borderRadius: '4px', cursor: 'pointer', color: T.blue, fontSize: '10px', fontFamily: T.fontMono, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+        {expanded ? <><ChevronUp size={12} /> {isAr ? 'عرض أقل' : 'Show Less'}</> : <><ChevronDown size={12} /> {isAr ? `عرض ${practices.length - 3} ممارسات إضافية` : `Show ${practices.length - 3} more practices`}</>}
+      </button>
+    </div>
+  );
+}
+
 // ── Level 2: Sub-Area View ────────────────────────────────────────────────────
 function SubAreaView({ area, city, onBack, onBackToCity }: {
   area: LiveSubArea; city: LiveCity; onBack: () => void; onBackToCity: () => void;
@@ -644,6 +977,18 @@ function SubAreaView({ area, city, onBack, onBackToCity }: {
           </div>
         </div>
       )}
+
+      {/* ── MINI MAP ─────────────────────────────────────────────────────── */}
+      <SubAreaMiniMap area={area} isAr={isAr} navigate={navigate} />
+
+      {/* ── SOLUTION SCENARIOS ───────────────────────────────────────────── */}
+      <SubAreaSolutions area={area} isAr={isAr} />
+
+      {/* ── WATER REUSE ──────────────────────────────────────────────────── */}
+      <SubAreaWaterReuse area={area} isAr={isAr} />
+
+      {/* ── PREVENTION & BEST PRACTICES ──────────────────────────────────── */}
+      <SubAreaPrevention area={area} isAr={isAr} />
     </div>
   );
 }
