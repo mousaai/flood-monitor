@@ -5,6 +5,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { fetchAllRegionsWeatherServer, invalidateServerWeatherCache } from "./weatherService";
+import { fetchSatelliteImage, fetchCopernicusCEMSActivations, searchSentinel1Scenes, SATELLITE_PROVIDERS } from "./satelliteService";
 import { fetchDrainageSystems, invalidateDrainageCache } from "./drainageService";
 import { getDb } from "./db";
 import { floodAlerts, alertSettings } from "../drizzle/schema";
@@ -674,6 +675,64 @@ ${input.platformContext.executiveSummary ? `Previously generated executive summa
           return { success: true };
         } catch (err) {
           return { success: false, error: String(err) };
+        }
+      }),
+  }),
+
+  // ── Satellite Imagery ────────────────────────────────────────────────────
+  satellite: router({
+    // Get list of available providers and their subscription requirements
+    getProviders: publicProcedure
+      .query(() => {
+        return { success: true, providers: SATELLITE_PROVIDERS };
+      }),
+
+    // Fetch satellite image (SAR or Optical) — requires credentials for Sentinel Hub
+    fetchImage: publicProcedure
+      .input(z.object({
+        bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+        dateFrom: z.string(),
+        dateTo: z.string(),
+        imageType: z.enum(['SAR', 'OPTICAL', 'FLOOD_MAP']),
+        credentials: z.object({
+          clientId: z.string(),
+          clientSecret: z.string(),
+        }).optional(),
+      }))
+      .query(async ({ input }) => {
+        try {
+          const result = await fetchSatelliteImage(input);
+          return result;
+        } catch (err) {
+          console.error('[satellite.fetchImage] Error:', err);
+          return { success: false, source: 'Unknown', error: String(err) };
+        }
+      }),
+
+    // Search for available Sentinel-1 scenes (free, no auth required)
+    searchScenes: publicProcedure
+      .input(z.object({
+        bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+        dateFrom: z.string(),
+        dateTo: z.string(),
+      }))
+      .query(async ({ input }) => {
+        try {
+          const scenes = await searchSentinel1Scenes(input.bbox, input.dateFrom, input.dateTo);
+          return { success: true, scenes };
+        } catch (err) {
+          return { success: false, scenes: [], error: String(err) };
+        }
+      }),
+
+    // Get Copernicus CEMS emergency activations (free)
+    getCEMSActivations: publicProcedure
+      .query(async () => {
+        try {
+          const activations = await fetchCopernicusCEMSActivations('UAE');
+          return { success: true, activations };
+        } catch (err) {
+          return { success: false, activations: [], error: String(err) };
         }
       }),
   }),

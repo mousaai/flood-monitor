@@ -1,9 +1,13 @@
 // SatellitesPage — FloodSat AI Abu Dhabi
 // Satellite constellation status, pass schedules, and data quality metrics
 
+import { useState } from 'react';
 import { satellitePasses } from '@/data/mockData';
-import { Satellite, Clock, Zap, CheckCircle, Circle, AlertCircle, FileDown } from 'lucide-react';
+import { Satellite, Clock, Zap, CheckCircle, Circle, AlertCircle, FileDown, Settings, Key } from 'lucide-react';
 import InfoTooltip, { TOOLTIPS } from '@/components/InfoTooltip';
+import SatelliteSettingsModal from '@/components/SatelliteSettingsModal';
+import SatelliteImageViewer from '@/components/SatelliteImageViewer';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const typeColors: Record<string, string> = {
   SAR: 'var(--cyan)',
@@ -41,23 +45,83 @@ function AccuracyRing({ value, color }: { value: number; color: string }) {
 }
 
 export default function SatellitesPage() {
+  const { lang } = useLanguage();
+  const isAr = lang === 'ar';
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState<{ name: string; bbox: [number,number,number,number] }>({
+    name: 'Abu Dhabi Emirate',
+    bbox: [51.5, 22.5, 56.5, 24.5]
+  });
+
   return (
     <div className="space-y-6">
+      <SatelliteSettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        lang={lang}
+      />
+
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold" style={{ fontFamily: 'Playfair Display, Georgia, serif' }}>Satellites</h1>
+          <h1 className="text-xl font-bold" style={{ fontFamily: 'Playfair Display, Georgia, serif' }}>
+            {isAr ? 'الأقمار الصناعية' : 'Satellites'}
+          </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            Satellite constellation status, traffic schedules and data quality
+            {isAr ? 'حالة الأقمار الصناعية وجلب الصور الرادارية' : 'Satellite constellation status, SAR imagery & data quality'}
           </p>
         </div>
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-2 px-3 py-2 rounded text-xs font-semibold flex-shrink-0"
-          style={{ background: 'rgba(139,92,246,0.10)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.30)' }}
-        >
-          <FileDown size={12} />
-          Export PDF
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded text-xs font-semibold flex-shrink-0"
+            style={{ background: 'rgba(0,212,255,0.10)', color: 'var(--cyan)', border: '1px solid rgba(0,212,255,0.30)' }}
+          >
+            <Key size={12} />
+            {isAr ? 'ربط الاشتراك' : 'Connect Subscription'}
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 px-3 py-2 rounded text-xs font-semibold flex-shrink-0"
+            style={{ background: 'rgba(139,92,246,0.10)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.30)' }}
+          >
+            <FileDown size={12} />
+            {isAr ? 'تصدير PDF' : 'Export PDF'}
+          </button>
+        </div>
+      </div>
+
+      {/* Satellite Image Viewer — Real SAR/Optical Imagery */}
+      <div className="card-dark p-4">
+        <SatelliteImageViewer
+          regionName={selectedRegion.name}
+          bbox={selectedRegion.bbox}
+          onOpenSettings={() => setSettingsOpen(true)}
+          lang={lang}
+        />
+      </div>
+
+      {/* Region Quick Select */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { name: 'Abu Dhabi Emirate', bbox: [51.5, 22.5, 56.5, 24.5] as [number,number,number,number] },
+          { name: 'Al Dhahir', bbox: [55.5, 23.2, 56.2, 23.8] as [number,number,number,number] },
+          { name: 'Al Ain City', bbox: [55.6, 24.0, 55.9, 24.3] as [number,number,number,number] },
+          { name: 'Al Shamkha', bbox: [54.3, 24.2, 54.6, 24.4] as [number,number,number,number] },
+          { name: 'Al Wathba', bbox: [54.5, 24.1, 54.8, 24.3] as [number,number,number,number] },
+        ].map(r => (
+          <button
+            key={r.name}
+            onClick={() => setSelectedRegion(r)}
+            className="px-3 py-1.5 rounded text-xs transition-colors"
+            style={{
+              background: selectedRegion.name === r.name ? 'rgba(0,212,255,0.15)' : 'rgba(255,255,255,0.05)',
+              color: selectedRegion.name === r.name ? 'var(--cyan)' : 'var(--text-muted)',
+              border: `1px solid ${selectedRegion.name === r.name ? 'rgba(0,212,255,0.3)' : 'var(--border-color)'}`,
+            }}
+          >
+            {r.name}
+          </button>
+        ))}
       </div>
 
       {/* Hero image */}
