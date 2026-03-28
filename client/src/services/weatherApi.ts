@@ -248,7 +248,7 @@ export async function fetchAllRegionsWeather(): Promise<SystemWeatherData> {
       if (!d || !d.current || !d.hourly) {
         allRegions.push({
           id: r.id, nameAr: r.nameAr, nameEn: r.nameEn, lat: r.lat, lon: r.lon,
-          currentPrecipitation: 0, currentTemperature: 30, currentWindSpeed: 0,
+          currentPrecipitation: 0, currentTemperature: 0, currentWindSpeed: 0,
           weatherCode: 0, precipitationProbability: 0,
           hourlyPrecipitation: Array(96).fill(0), hourlyTimes: genFallbackTimes(),
           hourlyProbability: Array(96).fill(0), totalLast24h: 0, maxNext48h: 0,

@@ -110,8 +110,11 @@ async function fetchLiveRegion(r: typeof REGIONS[0]): Promise<RegionSnapshot> {
   if (!res.ok) throw new Error(`Open-Meteo ${res.status}`);
   const d = await res.json();
 
-  const now = new Date();
-  const nowStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:00`;
+  // Use Dubai timezone (UTC+4) via direct UTC arithmetic — avoids browser Intl inconsistencies
+  const _now = new Date();
+  const _dubaiOffsetMs = 4 * 60 * 60 * 1000; // UTC+4
+  const _dubaiNow = new Date(_now.getTime() + _dubaiOffsetMs);
+  const nowStr = `${_dubaiNow.getUTCFullYear()}-${String(_dubaiNow.getUTCMonth()+1).padStart(2,'0')}-${String(_dubaiNow.getUTCDate()).padStart(2,'0')}T${String(_dubaiNow.getUTCHours()).padStart(2,'0')}:00`;
   const idx = d.hourly.time.findIndex((t: string) => t === nowStr);
   const ci = idx >= 0 ? idx : 24;
 
@@ -199,7 +202,7 @@ async function fetchArchiveRegion(
 function fallbackRegion(r: typeof REGIONS[0]): RegionSnapshot {
   return {
     id: r.id, nameAr: r.nameAr, nameEn: r.nameEn, lat: r.lat, lon: r.lon,
-    currentPrecipitation: 0, currentTemperature: 30, currentWindSpeed: 0,
+    currentPrecipitation: 0, currentTemperature: 0, currentWindSpeed: 0,
     precipitationProbability: 0, totalLast24h: 0, maxNext48h: 0,
     weatherCode: 0,
     floodRisk: 0, alertLevel: 'safe',
