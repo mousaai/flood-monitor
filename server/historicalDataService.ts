@@ -141,7 +141,7 @@ export async function fetchHistoricalData(): Promise<HistoricalComparisonData> {
 
   // Collect all years that appear in ALL cities
   const yearSets = results.map(r => new Set(r.years.map(y => y.year)));
-  const allYears = [...yearSets[0]].filter(y => yearSets.every(s => s.has(y))).sort();
+  const allYears = Array.from(yearSets[0]).filter(y => yearSets.every(s => s.has(y))).sort((a, b) => a - b);
 
   _cache = {
     cities: results,
