@@ -11,6 +11,7 @@ import { getDb } from "./db";
 import { floodAlerts, alertSettings } from "../drizzle/schema";
 import { desc, eq } from "drizzle-orm";
 import { triggerManualCheck } from "./alertEngine";
+import { fetchHistoricalData, invalidateHistoricalCache } from "./historicalDataService";
 
 // ── Flood Image Analysis ──────────────────────────────────────────────────────
 
@@ -676,6 +677,25 @@ ${input.platformContext.executiveSummary ? `Previously generated executive summa
         } catch (err) {
           return { success: false, error: String(err) };
         }
+      }),
+  }),
+
+  // ── Historical Data (ERA5 Archive) ──────────────────────────────────────
+  historical: router({
+    getData: publicProcedure
+      .query(async () => {
+        try {
+          const data = await fetchHistoricalData();
+          return { success: true, data };
+        } catch (err) {
+          console.error('[historical.getData] Error:', err);
+          return { success: false, data: null, error: String(err) };
+        }
+      }),
+    invalidateCache: publicProcedure
+      .mutation(() => {
+        invalidateHistoricalCache();
+        return { success: true };
       }),
   }),
 
