@@ -577,7 +577,30 @@ function SubAreaSolutions({ area, isAr }: { area: LiveSubArea; isAr: boolean }) 
     const areaSqKm = area.areaSqKm;
     const depth = area.waterAccumulation?.estimatedDepthCm ?? area.maxWaterDepthCm;
     type RegionTypeKey = 'coastal_island' | 'industrial' | 'heavy_industrial' | 'airport' | 'wadi' | 'agricultural' | 'desert_remote' | 'heritage_cultural' | 'urban_commercial' | 'urban_residential';
-    const rType: RegionTypeKey = ((area as any).regionType ?? 'urban_residential') as RegionTypeKey;
+    // تحديد نوع المنطقة بذكاء من area.type + area.nameEn + area.note
+    const _name = area.nameEn.toLowerCase();
+    const _note = (area.note ?? '').toLowerCase();
+    const _base = area.type; // 'residential' | 'commercial' | 'industrial' | 'agricultural' | 'mixed' | 'coastal'
+    const rType: RegionTypeKey = (
+      // الجزر الساحلية
+      (_name.includes('island') || _name.includes('dalma') || _name.includes('western island') || _note.includes('island') || _note.includes('tidal')) ? 'coastal_island' :
+      // المطارات
+      (_name.includes('airport') || _note.includes('airport')) ? 'airport' :
+      // الأودية والمناطق الجبلية
+      (_name.includes('wadi') || _name.includes('jabal') || _note.includes('wadi') || _note.includes('mountain') || _note.includes('seasonal wadi')) ? 'wadi' :
+      // الصناعي الثقيل (نفط وبتروكيماويات)
+      (_note.includes('petroleum') || _note.includes('oil') || _name.includes('ruwais') || _name.includes('habshan') || _name.includes('dhannah port') || _name.includes('das island')) ? 'heavy_industrial' :
+      // صناعي عام
+      (_base === 'industrial') ? 'industrial' :
+      // زراعي
+      (_base === 'agricultural' || _name.includes('farms') || _name.includes('farm')) ? 'agricultural' :
+      // صحراوي/نائي
+      (_name.includes('liwa') || _name.includes('ghayathi') || _name.includes('sila') || _name.includes('hamra') || _note.includes('desert')) ? 'desert_remote' :
+      // تجاري/سياحي/فندقي
+      (_base === 'commercial' || _name.includes('corniche') || _name.includes('marina') || _name.includes('yas') || _name.includes('saadiyat') || _name.includes('mariya')) ? 'urban_commercial' :
+      // سكني حضري (الافتراضي)
+      'urban_residential'
+    ) as RegionTypeKey;
     const scale = Math.min(areaSqKm, 50);
 
     // تكلفة الحل لكل كم² حسب طبيعة المنطقة (مليون درهم AED)
