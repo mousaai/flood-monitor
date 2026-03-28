@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>FloodSat AI — منصة الرصد الذكي للفيضانات | أبوظبي</title>
+    <meta name="description" content="منصة متكاملة لرصد تجمعات مياه الأمطار والفيضانات في إمارة أبوظبي عبر الأقمار الصناعية والذكاء الاصطناعي" />
+
+    <!-- Google Fonts — Geological Strata Design System -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400&family=Space+Mono:wght@400;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+      /* Geological dark theme — Leaflet popup override */
+      .leaflet-popup-content-wrapper {
+        background: rgba(13, 27, 42, 0.96) !important;
+        backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(66,165,245,0.35) !important;
+        border-radius: 6px !important;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(66,165,245,0.08) !important;
+        color: #E8F4F8 !important;
+        padding: 0 !important;
+      }
+      .leaflet-popup-content { margin: 0 !important; }
+      .leaflet-popup-tip { background: rgba(13,27,42,0.96) !important; }
+      .leaflet-popup-close-button {
+        color: #546E7A !important;
+        font-size: 16px !important;
+        top: 6px !important;
+        right: 6px !important;
+      }
+      .leaflet-control-zoom a {
+        background: rgba(13,27,42,0.9) !important;
+        color: #90CAF9 !important;
+        border-color: rgba(66,165,245,0.2) !important;
+      }
+      .leaflet-control-zoom a:hover {
+        background: rgba(21,34,51,0.95) !important;
+        color: #42A5F5 !important;
+      }
+      .leaflet-bar { border: 1px solid rgba(66,165,245,0.2) !important; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script
+      defer
+      src="%VITE_ANALYTICS_ENDPOINT%/umami"
+      data-website-id="%VITE_ANALYTICS_WEBSITE_ID%">
+    </script>
+  </body>
+</html>
