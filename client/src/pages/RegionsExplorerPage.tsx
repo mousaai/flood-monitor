@@ -22,6 +22,7 @@ import { useLiveRegions, type LiveSubArea, type LiveCity } from '@/hooks/useLive
 import { useRealWeather, computeWeatherSummary } from '@/hooks/useRealWeather';
 import { trpc } from '@/lib/trpc';
 import MetricTooltip from '@/components/MetricTooltip';
+import HistoricalReplay from '@/components/HistoricalReplay';
 import { useLocation } from 'wouter';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -1292,6 +1293,18 @@ function SubAreaView({ area, city, onBack, onBackToCity }: {
 
       {/* Historical/Forecast Chart */}
       <PrecipHistoryChart lat={area.lat} lon={area.lng} regionName={area.nameEn} />
+
+      {/* ── HISTORICAL REPLAY ─────────────────────────────────────────────── */}
+      <HistoricalReplay
+        regionId={area.id}
+        regionName={area.nameEn}
+        lat={area.lat}
+        lng={area.lng}
+        areaSqKm={area.areaSqKm}
+        population={area.population}
+        elevationM={(area as any).elevation ?? 10}
+        color={alertColor(area.alertLevel)}
+      />
 
       {/* Risk profile + Water depth distribution */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>

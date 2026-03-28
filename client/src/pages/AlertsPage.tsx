@@ -12,6 +12,7 @@ import {
   ChevronRight, ExternalLink, Activity, FileDown,
 } from 'lucide-react';
 import InfoTooltip from '@/components/InfoTooltip';
+import HistoricalReplay from '@/components/HistoricalReplay';
 
 const ALERT_TOOLTIPS = {
   pageTitle: {
@@ -74,8 +75,9 @@ const ALERT_DETAILS: Record<string, {
   historicalNote: string;
 }> = {
   'alert-1': {
-    lat: 24.2075, lng: 55.7447,
-    elevation: '280 m above sea level',
+    // Ghayathi — Al Dhafra Region (correct coordinates: 23.8340°N, 52.8050°E)
+    lat: 23.8340, lng: 52.8050,
+    elevation: '85 m above sea level',
     waterDepth: '2.4 meter',
     affectedArea: '12.3 km²',
     affectedPop: '~18,500 persons',
@@ -85,12 +87,13 @@ const ALERT_DETAILS: Record<string, {
     satellite: 'ICEYE-X27 (SAR C-Band)',
     passTime: '04:07 UTC',
     resolution: '1 meter × 1 meter',
-    responseTeam: 'Civil Defense Team — Al Ain',
+    responseTeam: 'Civil Defense Team — Al Dhafra Region',
     estimatedPeak: '08:30 UTC (During 4.5 hour)',
-    historicalNote: 'Wadi Al Jimi recorded a similar flood in April 2024 with depth 3.1 meters',
+    historicalNote: 'Ghayathi recorded a similar flood in April 2024 — NCM highest reading in Abu Dhabi Emirate at 91 mm',
   },
   'alert-2': {
-    lat: 24.4539, lng: 54.3773,
+    // Al Wathba — Abu Dhabi Emirate (correct coordinates: 24.2600°N, 54.6100°E)
+    lat: 24.2600, lng: 54.6100,
     elevation: '5 m above sea level',
     waterDepth: 'Forecast 0.3–0.8 meters',
     affectedArea: '~45 km² (low-lying areas)',
@@ -103,10 +106,11 @@ const ALERT_DETAILS: Record<string, {
     resolution: '10 km × 10 km (GPM)',
     responseTeam: 'Emergency Management Center — Abu Dhabi',
     estimatedPeak: '10:00–12:00 UTC',
-    historicalNote: 'Low-lying areas in Corniche and Airport Street most prone to accumulation',
+    historicalNote: 'Al Wathba low-lying areas — NCM station recorded 88.2 mm (3rd highest UAE-wide)',
   },
   'alert-3': {
-    lat: 24.4, lng: 54.55,
+    // Mohammed Bin Zayed City — Abu Dhabi (correct coordinates: 24.3500°N, 54.5200°E)
+    lat: 24.3500, lng: 54.5200,
     elevation: '8 m above sea level',
     waterDepth: '0.15–0.45 meter (Roads)',
     affectedArea: '8.7 km²',
@@ -122,7 +126,8 @@ const ALERT_DETAILS: Record<string, {
     historicalNote: 'Khalifa bin Zayed Street and E11 intersection are frequent accumulation points',
   },
   'alert-4': {
-    lat: 24.55, lng: 54.45,
+    // Al Ruwais — Al Dhafra Region (correct coordinates: 24.1100°N, 52.7300°E)
+    lat: 24.1100, lng: 52.7300,
     elevation: '3 m above sea level',
     waterDepth: '0.05–0.20 meter',
     affectedArea: '3.2 km²',
@@ -130,35 +135,57 @@ const ALERT_DETAILS: Record<string, {
     windSpeed: '18 km/hr (North)',
     temperature: '23.5°C',
     humidity: '72%',
-    satellite: 'GPM IMERG',
+    satellite: 'MODIS NRT + GPM IMERG',
     passTime: '04:05 UTC',
-    resolution: '10 km × 10 km',
-    responseTeam: 'Municipality Abu Dhabi — Al Shahama',
-    estimatedPeak: 'Montinuous monitoring',
-    historicalNote: 'Drainage channels in Al Shahama have limited capacity (0.4 drainage coefficient)',
+    resolution: '250 m × 250 m',
+    responseTeam: 'ADNOC Emergency Response — Al Ruwais Industrial',
+    estimatedPeak: 'Continuous monitoring',
+    historicalNote: 'Al Ruwais industrial zone — NCM station 75.7 mm (5th highest UAE) — impact on petrochemical facilities',
   },
   'alert-5': {
-    lat: 23.5, lng: 53.5,
-    elevation: '120 m above sea level',
+    // Al Ain City — Al Ain Region (correct coordinates: 24.2075°N, 55.7447°E)
+    lat: 24.2075, lng: 55.7447,
+    elevation: '280 m above sea level',
     waterDepth: 'Receding to 0.3 meters',
     affectedArea: '28.4 km²',
-    affectedPop: '~4,200 persons',
+    affectedPop: '~766,000 persons',
     windSpeed: '22 km/hr (South East)',
     temperature: '26.2°C',
     humidity: '45%',
-    satellite: 'MODIS NRT (Terra)',
+    satellite: 'GPM IMERG + NCM Radar',
     passTime: '04:02 UTC',
-    resolution: '250 meter × 250 meter',
-    responseTeam: 'Al Dhafra Administration',
-    estimatedPeak: 'Continuous improvement — no forecasted peak',
-    historicalNote: 'Southern wadis in Al Dhafra drain quickly due to elevation and natural slope',
+    resolution: '10 km × 10 km (GPM)',
+    responseTeam: 'Al Ain Civil Defense — Emergency Operations',
+    estimatedPeak: 'Continuous monitoring — storm moving east',
+    historicalNote: 'Wadi Al Jimi in Al Ain recorded a similar flood in April 2024 with depth 3.1 meters',
+  },
+  'alert-6': {
+    // Khalifa City — Abu Dhabi Emirate (correct coordinates: 24.4050°N, 54.5500°E)
+    lat: 24.4050, lng: 54.5500,
+    elevation: '12 m above sea level',
+    waterDepth: '0.10–0.35 meter',
+    affectedArea: '4.8 km²',
+    affectedPop: '~180,000 persons',
+    windSpeed: '14 km/hr (North West)',
+    temperature: '23.9°C',
+    humidity: '68%',
+    satellite: 'Sentinel-1A (SAR C-Band)',
+    passTime: '04:18 UTC',
+    resolution: '5 meter × 5 meter',
+    responseTeam: 'Abu Dhabi Municipality — Khalifa City Operations',
+    estimatedPeak: '09:30–11:00 UTC',
+    historicalNote: 'Khalifa City A main roads prone to water accumulation — similar event in March 2024',
   },
 };
 
-// Small map with OpenStreetMap static
-function MiniMap({ lat, lng, color }: { lat: number; lng: number; color: string }) {
-  const zoom = 13;
-  const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.05},${lat - 0.04},${lng + 0.05},${lat + 0.04}&layer=mapnik&marker=${lat},${lng}`;
+// Small map with OpenStreetMap static — adaptive bbox based on region type
+function MiniMap({ lat, lng, color, alertId }: { lat: number; lng: number; color: string; alertId?: string }) {
+  // Adaptive bbox: Al Dhafra regions need wider view, city regions need tighter
+  const isAlDhafra = alertId === 'alert-1' || alertId === 'alert-4'; // Ghayathi, Ruwais
+  const isAlAin = alertId === 'alert-5';
+  const delta = isAlDhafra ? 0.18 : isAlAin ? 0.12 : 0.06;
+  const deltaLat = delta * 0.75;
+  const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${lng - delta},${lat - deltaLat},${lng + delta},${lat + deltaLat}&layer=mapnik&marker=${lat},${lng}`;
   return (
     <div style={{
       width: '100%', height: '180px', borderRadius: '8px', overflow: 'hidden',
@@ -327,7 +354,7 @@ function AlertDetailPanel({
             </div>
             <div>
               {details && (
-                <MiniMap lat={details.lat} lng={details.lng} color={cfg.color} />
+                <MiniMap lat={details.lat} lng={details.lng} color={cfg.color} alertId={a.id} />
               )}
               {details && (
                 <a
@@ -422,6 +449,21 @@ function AlertDetailPanel({
               )}
             </div>
           </div>
+
+          {/* Historical Replay — Hourly water volume & road impact */}
+          {details && (
+            <HistoricalReplay
+              regionId={a.regionId}
+              regionName={a.regionAr}
+              lat={details.lat}
+              lng={details.lng}
+              areaSqKm={parseFloat(details.affectedArea) || 12}
+              population={parseInt(details.affectedPop.replace(/[^0-9]/g, '')) || 18000}
+              elevationM={parseInt(details.elevation) || 10}
+              color={cfg.color}
+              compact={true}
+            />
+          )}
 
           {/* Confidence bar */}
           <div style={{

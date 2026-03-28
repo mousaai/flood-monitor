@@ -176,10 +176,12 @@ export const regions90: Region[] = [
   mkRegion('al-dhafra-madinat',        'Madinat Zayed',          'Madinat Zayed',             23.6500, 53.7100, 35.8,   28000,  850),
   mkRegion('al-dhafra-habshan',        'Habshan',                'Habshan',                   23.8500, 53.5500, 42.0,   15000,  500),
   mkRegion('al-dhafra-bida-zayed',     'Bida Zayed',             'Bida Zayed',                23.6500, 53.7000, 36.5,   20000,  700),
-  mkRegion('al-dhafra-al-ajban',       'Al Ajban',               'Al Ajban',                  24.3400, 54.9000, 58.0,   18000,  400),
+  // Al Ajban: between Abu Dhabi and Al Ain — correct coords 24.5743°N, 55.2701°E
+  mkRegion('al-dhafra-al-ajban',       'Al Ajban',               'Al Ajban',                  24.5743, 55.2701, 58.0,   18000,  400),
   mkRegion('al-dhafra-al-wagan',       'Al Wagan — Dhafra',      'Al Wagan — Dhafra',         23.7000, 53.2000, 38.0,    8000,  900),
   mkRegion('al-dhafra-al-quaa',        'Al Quaa — Dhafra',       'Al Quaa — Dhafra',          23.5000, 53.8000, 28.5,    6000, 1500),
-  mkRegion('al-dhafra-al-khatm',       'Al Khatm',               'Al Khatm',                  24.0500, 55.4000, 40.0,   12000,  600),
+  // Al Khatm: on Abu Dhabi-Al Ain road — correct coords 24.1900°N, 54.9937°E
+  mkRegion('al-dhafra-al-khatm',       'Al Khatm',               'Al Khatm',                  24.1900, 54.9937, 40.0,   12000,  600),
   mkRegion('al-dhafra-al-oha',         'Al Oha',                 'Al Oha',                    23.9000, 53.0000, 45.0,    9000,  800),
   mkRegion('al-dhafra-al-hamra',       'Al Hamra',               'Al Hamra',                  24.0000, 52.5000, 60.0,   14000,  300),
   mkRegion('al-dhafra-al-ruways-i',    'Al Ruwais Industrial',   'Al Ruwais Industrial Zone', 24.0800, 52.7000, 73.0,   25000,  450),
