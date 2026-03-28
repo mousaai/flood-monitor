@@ -21,6 +21,7 @@ import { WaterLegend } from '@/components/WaterLegend';
 import { WATER_COLORS, WATER_LABELS, WATER_ICONS, classifyByDepth, formatDepth, formatVolume } from '@shared/waterStandard';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useIsMobile } from '@/hooks/useMobile';
+import MobileBottomSheet from '@/components/MobileBottomSheet';
 import { trpc } from '@/lib/trpc';
 import KPIDrillDown, { type DrillDownType } from '@/components/KPIDrillDown';
 
@@ -970,16 +971,80 @@ export default function UnifiedMapPage() {
   const liveRegionsWithWater = accSummary?.totalRegionsWithWater ?? 0;
   const liveActiveWadis = accSummary?.activeWadis ?? 0;
 
-  return (
-    <div style={{ display: 'flex', height: '100%', background: 'var(--bg-primary)', fontFamily: 'Tajawal, sans-serif', direction: lang === 'ar' ? 'rtl' : 'ltr' }}>
+  // ── Shared panel content (used in both desktop sidebar and mobile bottom sheet) ──
+  const panelContent = (
+    <>
+      {/* Panel Header */}
+      <div style={{ padding: '10px 10px 0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: '#e2e8f0', letterSpacing: '0.02em' }}>operations center</div>
+            <div style={{ fontSize: '10px', color: '#475569', marginTop: '1px' }}>Emirate Abu Dhabi • Monitor Live</div>
+          </div>
+          <button onClick={refresh} title="Update" style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.2)', borderRadius: '5px', cursor: 'pointer', color: '#00d4ff', padding: '4px 6px', display: 'flex', alignItems: 'center' }}>
+            <RefreshCw size={10} />
+          </button>
+        </div>
+        {/* Live status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 8px', background: isLive ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', borderRadius: '6px', border: `1px solid ${isLive ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`, marginBottom: '10px' }}>
+          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: isLive ? '#10B981' : '#EF4444', boxShadow: isLive ? '0 0 6px #10B981' : 'none', flexShrink: 0 }} />
+          <span style={{ fontSize: '10px', color: isLive ? '#10B981' : '#EF4444', flex: 1 }}>
+            {isLive ? `Live — ${lastUpdated?.toLocaleTimeString('ar-AE', { hour: '2-digit', minute: '2-digit' })}` : 'Awaiting data...'}
+          </span>
+          <span style={{ fontSize: '9px', color: '#334155' }}>Open-Meteo</span>
+        </div>
+        {/* KPI row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '4px', marginBottom: '10px' }}>
+          {[
+            { label: lang === 'ar' ? 'تنبيهات' : 'Alerts', value: totalAlerts, color: criticalZones > 0 ? '#EF4444' : warningZones > 0 ? '#F97316' : '#F59E0B', bg: criticalZones > 0 ? 'rgba(239,68,68,0.12)' : warningZones > 0 ? 'rgba(249,115,22,0.12)' : 'rgba(245,158,11,0.1)', drill: 'criticalRegions' as DrillDownType },
+            { label: lang === 'ar' ? `ح${criticalZones}·ت${warningZones}·م${watchZones}` : `C${criticalZones}·W${warningZones}·M${watchZones}`, value: '', color: '#64748b', bg: 'rgba(100,116,139,0.06)', drill: 'warningRegions' as DrillDownType },
+            { label: 'mm', value: totalPrecip, color: '#3B82F6', bg: 'rgba(59,130,246,0.1)', drill: 'totalPrecip' as DrillDownType },
+            { label: lang === 'ar' ? 'خطر%' : 'Risk%', value: maxRisk, color: '#F97316', bg: 'rgba(249,115,22,0.1)', drill: 'risk' as DrillDownType },
+          ].map(k => (
+            <button
+              key={k.label}
+              onClick={() => data && setKpiModal(k.drill)}
+              style={{ background: k.bg, borderRadius: '6px', padding: '5px 3px', textAlign: 'center', border: `1px solid ${k.color}44`, cursor: data ? 'pointer' : 'default', transition: 'all 0.15s', outline: 'none' }}
+            >
+              <div style={{ fontSize: '15px', fontWeight: 800, color: k.color, fontFamily: 'monospace', lineHeight: 1 }}>{k.value}</div>
+              <div style={{ fontSize: '8px', color: '#475569', marginTop: '2px' }}>{k.label}</div>
+            </button>
+          ))}
+        </div>
+        {/* Tab bar */}
+        <div style={{ display: 'flex', gap: '2px', marginBottom: '0', background: 'rgba(255,255,255,0.03)', borderRadius: '8px 8px 0 0', padding: '3px 3px 0' }}>
+          {([
+            { id: 'layers' as PanelTab, label: 'Layers', icon: <Layers size={11} /> },
+            { id: 'zones' as PanelTab, label: 'Regions', icon: <MapPin size={11} /> },
+            { id: 'stats' as PanelTab, label: 'Statistics', icon: <BarChart2 size={11} /> },
+          ] as { id: PanelTab; label: string; icon: React.ReactNode }[]).map(tab => (
+            <button key={tab.id} onClick={() => setPanelTab(tab.id)} style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+              padding: '6px 4px', borderRadius: '6px 6px 0 0', border: 'none', cursor: 'pointer', fontSize: '10px',
+              background: panelTab === tab.id ? 'rgba(0,212,255,0.12)' : 'transparent',
+              color: panelTab === tab.id ? '#00d4ff' : '#475569',
+              fontWeight: panelTab === tab.id ? 700 : 400,
+              borderBottom: panelTab === tab.id ? '2px solid #00d4ff' : '2px solid transparent',
+              transition: 'all 0.15s ease',
+            }}>
+              {tab.icon} {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  );
 
-      {/* ── Side Panel ── */}
+  return (
+    <div style={{ display: 'flex', height: '100%', background: 'var(--bg-primary)', fontFamily: 'Tajawal, sans-serif', direction: lang === 'ar' ? 'rtl' : 'ltr', position: 'relative' }}>
+
+      {/* ── Side Panel (Desktop only) ── */}
       <div style={{
-        width: panelCollapsed ? '48px' : '260px',
-        minWidth: panelCollapsed ? '48px' : '260px',
+        width: isMobile ? '0' : (panelCollapsed ? '48px' : '260px'),
+        minWidth: isMobile ? '0' : (panelCollapsed ? '48px' : '260px'),
         background: 'rgba(10,14,20,0.98)',
         borderLeft: '1px solid rgba(0,212,255,0.12)',
-        display: 'flex', flexDirection: 'column',
+        display: isMobile ? 'none' : 'flex', flexDirection: 'column',
         transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), min-width 0.28s cubic-bezier(0.4,0,0.2,1)',
         overflow: 'hidden', zIndex: 10,
       }}>
@@ -1443,6 +1508,155 @@ export default function UnifiedMapPage() {
         )}
       </div>{/* end map div */}
       </div>{/* end right column */}
+
+      {/* ── Mobile Bottom Sheet ── */}
+      {isMobile && (
+        <MobileBottomSheet defaultSnap="half" peekHeight={80}>
+          {/* Panel content header */}
+          <div style={{ padding: '0 10px 0', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#e2e8f0' }}>operations center</div>
+                <div style={{ fontSize: '10px', color: '#475569' }}>Emirate Abu Dhabi • Monitor Live</div>
+              </div>
+              <button onClick={refresh} title="Update" style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.2)', borderRadius: '5px', cursor: 'pointer', color: '#00d4ff', padding: '4px 6px', display: 'flex', alignItems: 'center' }}>
+                <RefreshCw size={10} />
+              </button>
+            </div>
+            {/* Live status */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 8px', background: isLive ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', borderRadius: '6px', border: `1px solid ${isLive ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`, marginBottom: '8px' }}>
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: isLive ? '#10B981' : '#EF4444', boxShadow: isLive ? '0 0 6px #10B981' : 'none', flexShrink: 0 }} />
+              <span style={{ fontSize: '10px', color: isLive ? '#10B981' : '#EF4444', flex: 1 }}>
+                {isLive ? `Live — ${lastUpdated?.toLocaleTimeString('ar-AE', { hour: '2-digit', minute: '2-digit' })}` : 'Awaiting data...'}
+              </span>
+              <span style={{ fontSize: '9px', color: '#334155' }}>Open-Meteo</span>
+            </div>
+            {/* KPI row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '4px', marginBottom: '8px' }}>
+              {[
+                { label: 'Alerts', value: totalAlerts, color: criticalZones > 0 ? '#EF4444' : '#F59E0B', bg: criticalZones > 0 ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.1)', drill: 'criticalRegions' as DrillDownType },
+                { label: `C${criticalZones}·W${warningZones}`, value: '', color: '#64748b', bg: 'rgba(100,116,139,0.06)', drill: 'warningRegions' as DrillDownType },
+                { label: 'mm', value: totalPrecip, color: '#3B82F6', bg: 'rgba(59,130,246,0.1)', drill: 'totalPrecip' as DrillDownType },
+                { label: 'Risk%', value: maxRisk, color: '#F97316', bg: 'rgba(249,115,22,0.1)', drill: 'risk' as DrillDownType },
+              ].map(k => (
+                <button key={k.label} onClick={() => data && setKpiModal(k.drill)}
+                  style={{ background: k.bg, borderRadius: '6px', padding: '5px 3px', textAlign: 'center', border: `1px solid ${k.color}44`, cursor: data ? 'pointer' : 'default', outline: 'none' }}>
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: k.color, fontFamily: 'monospace', lineHeight: 1 }}>{k.value}</div>
+                  <div style={{ fontSize: '8px', color: '#475569', marginTop: '2px' }}>{k.label}</div>
+                </button>
+              ))}
+            </div>
+            {/* Tab bar */}
+            <div style={{ display: 'flex', gap: '2px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px 8px 0 0', padding: '3px 3px 0' }}>
+              {([
+                { id: 'layers' as PanelTab, label: 'Layers', icon: <Layers size={11} /> },
+                { id: 'zones' as PanelTab, label: 'Regions', icon: <MapPin size={11} /> },
+                { id: 'stats' as PanelTab, label: 'Statistics', icon: <BarChart2 size={11} /> },
+              ] as { id: PanelTab; label: string; icon: React.ReactNode }[]).map(tab => (
+                <button key={tab.id} onClick={() => setPanelTab(tab.id)} style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  padding: '6px 4px', borderRadius: '6px 6px 0 0', border: 'none', cursor: 'pointer', fontSize: '10px',
+                  background: panelTab === tab.id ? 'rgba(0,212,255,0.12)' : 'transparent',
+                  color: panelTab === tab.id ? '#00d4ff' : '#475569',
+                  fontWeight: panelTab === tab.id ? 700 : 400,
+                  borderBottom: panelTab === tab.id ? '2px solid #00d4ff' : '2px solid transparent',
+                  transition: 'all 0.15s ease',
+                }}>
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tab content */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '10px', background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            {/* Layers tab */}
+            {panelTab === 'layers' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                  {(['dark', 'satellite'] as const).map(s => (
+                    <button key={s} onClick={() => setMapStyle(s)} style={{
+                      flex: 1, padding: '6px 4px', borderRadius: '6px', border: `1px solid ${mapStyle === s ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.07)'}`, cursor: 'pointer', fontSize: '10px',
+                      background: mapStyle === s ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.04)',
+                      color: mapStyle === s ? '#00d4ff' : '#475569', fontWeight: mapStyle === s ? 700 : 400,
+                    }}>{s === 'dark' ? '🌑 Dark' : '🛰️ Satellite'}</button>
+                  ))}
+                </div>
+                <div style={{ fontSize: '9px', color: '#334155', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '2px' }}>Active Layers</div>
+                {LAYERS.map(layer => (
+                  <button key={layer.key} onClick={() => toggleLayer(layer.key)} style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '8px 10px', borderRadius: '8px', border: `1px solid ${activeLayers[layer.key] ? layer.color + '33' : 'rgba(255,255,255,0.05)'}`,
+                    cursor: 'pointer', background: activeLayers[layer.key] ? `${layer.color}0f` : 'rgba(255,255,255,0.02)',
+                    transition: 'all 0.15s ease', textAlign: 'right',
+                  }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: activeLayers[layer.key] ? `${layer.color}22` : 'rgba(255,255,255,0.05)', color: activeLayers[layer.key] ? layer.color : '#334155' }}>{layer.icon}</div>
+                    <span style={{ fontSize: '11px', color: activeLayers[layer.key] ? '#e2e8f0' : '#475569', flex: 1, fontWeight: activeLayers[layer.key] ? 600 : 400 }}>{layer.labelAr}</span>
+                    <div style={{ width: '18px', height: '10px', borderRadius: '5px', flexShrink: 0, background: activeLayers[layer.key] ? layer.color : 'rgba(255,255,255,0.1)', position: 'relative', transition: 'background 0.2s ease' }}>
+                      <div style={{ position: 'absolute', top: '1px', width: '8px', height: '8px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', left: activeLayers[layer.key] ? '9px' : '1px' }} />
+                    </div>
+                  </button>
+                ))}
+                {activeLayers.drainage && (
+                  <div style={{ padding: '8px', background: 'rgba(245,158,11,0.06)', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.15)' }}>
+                    <div style={{ fontSize: '9px', color: '#F59E0B', fontWeight: 700, marginBottom: '5px' }}>Drainage Network Load</div>
+                    {[['#10B981','Normal load (< 60%)'],['#F59E0B','Warning (60-80%)'],['#EF4444','Overloaded (> 80%)']].map(([c,l]) => (
+                      <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: c, flexShrink: 0 }} />
+                        <span style={{ fontSize: '9px', color: '#64748b' }}>{l}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {/* Regions tab */}
+            {panelTab === 'zones' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {FLOOD_ZONES.map(zone => (
+                  <button key={zone.id} onClick={() => {
+                    setSelectedFeature({ type: 'flood', zone });
+                    if (leafletMapRef.current) leafletMapRef.current.setView([zone.lat, zone.lng], 14);
+                  }} style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '7px 8px', borderRadius: '7px', cursor: 'pointer',
+                    background: 'rgba(255,255,255,0.02)', border: `1px solid ${RISK_COLORS[zone.riskLevel]}22`,
+                    transition: 'background 0.15s ease', textAlign: 'right',
+                  }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: RISK_COLORS[zone.riskLevel], flexShrink: 0 }} />
+                    <span style={{ fontSize: '10px', color: '#94a3b8', flex: 1 }}>{zone.nameAr.split('—')[0].trim()}</span>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: RISK_COLORS[zone.riskLevel], fontFamily: 'monospace', lineHeight: 1 }}>{Math.round(zone.waterDepth * precipMultiplier)} <span style={{ fontSize: '8px' }}>cm</span></div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* Stats tab */}
+            {panelTab === 'stats' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ padding: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 700, color: '#00d4ff', marginBottom: '6px' }}>Metric Risk Roads</div>
+                  <div style={{ height: '7px', borderRadius: '4px', background: 'linear-gradient(to left,#7C3AED,#EF4444,#F97316,#F59E0B,#84CC16,#10B981)', marginBottom: '4px' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    {['Safe','Low','Warning','Risk','Flooded'].map(l => <span key={l} style={{ fontSize: '8px', color: '#334155' }}>{l}</span>)}
+                  </div>
+                </div>
+                <div style={{ padding: '8px', background: 'rgba(0,80,200,0.08)', borderRadius: '8px', border: '1px solid rgba(0,120,255,0.15)' }}>
+                  <div style={{ fontSize: '9px', color: '#475569', marginBottom: '4px' }}>current rainfall multiplier</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ flex: 1, height: '5px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.min(100, precipMultiplier / 2.5 * 100)}%`, height: '100%', borderRadius: '3px', background: precipMultiplier > 1.5 ? '#EF4444' : precipMultiplier > 1.0 ? '#F59E0B' : '#3B82F6', transition: 'width 0.8s ease' }} />
+                    </div>
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: '#42A5F5', fontFamily: 'monospace', flexShrink: 0 }}>×{precipMultiplier.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </MobileBottomSheet>
+      )}
+
       {/* KPI Drill-Down Modal */}
       {kpiModal && data && (
         <KPIDrillDown
