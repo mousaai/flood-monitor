@@ -576,24 +576,388 @@ function SubAreaSolutions({ area, isAr }: { area: LiveSubArea; isAr: boolean }) 
   const scenarios = useMemo(() => {
     const areaSqKm = area.areaSqKm;
     const depth = area.waterAccumulation?.estimatedDepthCm ?? area.maxWaterDepthCm;
-    const type = (area as any).type ?? 'residential';
-    const baseCostPerKm2 = type === 'commercial' ? 2.5 : type === 'industrial' ? 2.0 : type === 'airport' ? 3.5 : 1.5;
+    type RegionTypeKey = 'coastal_island' | 'industrial' | 'heavy_industrial' | 'airport' | 'wadi' | 'agricultural' | 'desert_remote' | 'heritage_cultural' | 'urban_commercial' | 'urban_residential';
+    const rType: RegionTypeKey = ((area as any).regionType ?? 'urban_residential') as RegionTypeKey;
     const scale = Math.min(areaSqKm, 50);
+
+    // تكلفة الحل لكل كم² حسب طبيعة المنطقة (مليون درهم AED)
+    const costFactor =
+      rType === 'urban_commercial'  ? 3.5 :
+      rType === 'heavy_industrial'  ? 4.5 :
+      rType === 'industrial'        ? 3.0 :
+      rType === 'airport'           ? 5.0 :
+      rType === 'coastal_island'    ? 4.0 :
+      rType === 'wadi'              ? 2.5 :
+      rType === 'agricultural'      ? 1.5 :
+      rType === 'desert_remote'     ? 1.2 :
+      rType === 'heritage_cultural' ? 3.8 :
+      2.0; // urban_residential
+
+    // حلول سريعة مخصصة حسب نوع المنطقة
+    const quickSolutions: string[] = {
+      coastal_island:    isAr ? [
+        'نشر حواجز بحرية مؤقتة لمنع تدفق مياه البحر للداخل',
+        'تشغيل مضخات طوارئ لضخ مياه الفيضان نحو البحر',
+        'تعليق الحركة في المناطق الساحلية المنخفضة',
+        'إغلاق الممرات السفلية والأنفاق الساحلية',
+      ] : [
+        'Deploy temporary marine barriers to prevent seawater intrusion',
+        'Activate emergency pumps to drain floodwater toward sea',
+        'Suspend traffic in low-lying coastal zones',
+        'Close coastal underpasses and tunnels',
+      ],
+      industrial:        isAr ? [
+        'إغلاق المصارف ومنع تدفق الملوثات لشبكة الصرف',
+        'نشر مضخات صناعية سعة 2000 مجمك/ساعة',
+        'تحويل مياه الفيضان لخزانات احتجاز مؤقتة',
+        'فحص جودة المياه قبل التصريف',
+      ] : [
+        'Close industrial drains to prevent pollutant discharge',
+        'Deploy industrial pumps (2,000 m³/hr) for rapid drainage',
+        'Divert floodwater to temporary containment basins',
+        'Test water quality before any discharge',
+      ],
+      heavy_industrial:  isAr ? [
+        'إغلاق طوارئ منافذ الصرف لمنع تسرب الهيدروكربونات',
+        'تفعيل بروتوكول طوارئ التسرب النفطي',
+        'نشر سدود رملية حول المنشآت الحساسة',
+        'تعليق العمليات غير الضرورية في المنشآت النفطية',
+      ] : [
+        'Emergency shutdown of drainage outlets to prevent hydrocarbon leaks',
+        'Activate oil spill emergency protocol',
+        'Deploy sandbag barriers around sensitive facilities',
+        'Suspend non-essential operations at petrochemical plants',
+      ],
+      airport:           isAr ? [
+        'تشغيل مضخات طوارئ تحت المدارج والمرافئ',
+        'تحويل مياه الأمطار لخزانات المطار التحتية',
+        'تعليق الرحلات وفق بروتوكول ICAO للفيضانات',
+        'تفعيل خطة طوارئ المطار للحوادث المائية',
+      ] : [
+        'Activate runway/taxiway emergency drainage pumps',
+        'Divert rainwater to airport underground cisterns',
+        'Suspend flights per ICAO flood emergency protocol',
+        'Activate airport flood emergency response plan',
+      ],
+      wadi:              isAr ? [
+        'فتح بوابات السدود لتخفيف ضغط السيل',
+        'إغلاق الطرق المتقاطعة مع مجرى الوادي',
+        'إخلاء المناطق المنخفضة على جانبي الوادي',
+        'تفعيل نظام إنذار مبكر للسيول المفاجئة',
+      ] : [
+        'Open dam gates to relieve flood pressure',
+        'Close roads crossing wadi channels',
+        'Evacuate low-lying areas on wadi banks',
+        'Activate flash flood early warning system',
+      ],
+      agricultural:      isAr ? [
+        'فتح قنوات الري لتحويل المياه للخزانات الزراعية',
+        'حماية المحاصيل بالحواجز الترابية',
+        'ضخ المياه الزائدة لخزانات التخزين المؤقت',
+        'تقييم الخسائر وتفعيل بروتوكول التعويض',
+      ] : [
+        'Open irrigation channels to divert water to farm storage',
+        'Protect crops with earthen berms',
+        'Pump excess water to temporary storage ponds',
+        'Assess crop losses and activate compensation protocol',
+      ],
+      desert_remote:     isAr ? [
+        'تحويل مياه السيول نحو المنخفضات الطبيعية',
+        'إغلاق طرق الصحراء والتحذير من السيول',
+        'مراقبة مستويات السدود الترابية',
+        'تفعيل بروتوكول إنقاذ مركبات عالقة',
+      ] : [
+        'Divert flash flood flows toward natural depressions',
+        'Close desert roads and issue wadi crossing warnings',
+        'Monitor earthen dam levels remotely',
+        'Activate stranded vehicle rescue protocol',
+      ],
+      heritage_cultural: isAr ? [
+        'تغطية المباني التراثية بالأكياس الواقية',
+        'نشر مضخات صغيرة للتصريف دون تلف المواقع',
+        'توثيق حالة المباني بالصور قبل وبعد الفيضان',
+        'تفعيل فريق طوارئ ترميم التراث',
+      ] : [
+        'Cover heritage buildings with protective sheeting',
+        'Deploy small pumps for drainage without site damage',
+        'Document building condition before and after flood',
+        'Activate heritage emergency restoration team',
+      ],
+      urban_commercial:  isAr ? [
+        'تفعيل مضخات الطوابق السفلية والمواقف التحتية',
+        'إغلاق المداخل السفلية للمباني التجارية',
+        'تحويل حركة المرور من الشوارع المغمورة',
+        'تفعيل بروتوكول طوارئ المراكز التجارية',
+      ] : [
+        'Activate basement & underground parking drainage pumps',
+        'Close lower-ground entrances to commercial buildings',
+        'Divert traffic from flooded commercial streets',
+        'Activate mall/commercial center flood emergency protocol',
+      ],
+      urban_residential: isAr ? [
+        'نشر مضخات مياه محمولة (500–2000 مجمك/ساعة)',
+        'حواجز مؤقتة لتحويل مسار المياه',
+        'تنظيف مداخل الصرف المسدودة',
+        'تحذيرات إخلاء للمناطق السكنية المنخفضة',
+      ] : [
+        'Deploy mobile pumps (500–2,000 m³/hr)',
+        'Temporary barriers to redirect water flow',
+        'Clear blocked drainage inlets',
+        'Evacuation warnings for low-lying residential zones',
+      ],
+    }[rType];
+
+    // حلول متوسطة مخصصة
+    const mediumSolutions: string[] = {
+      coastal_island:    isAr ? [
+        'إنشاء جدران بحرية دائمة ورفع منسوب الأرصفة الساحلية',
+        'تركيب بوابات تحكم ذكية في نقاط التصريف الساحلي',
+        'تحسين شبكة صرف مياه الأمطار بمعيار العاصفة المئوية',
+        'زراعة أشجار المانغروف كحواجز طبيعية للأمواج',
+      ] : [
+        'Build permanent sea walls & raise coastal promenade elevation',
+        'Install smart tide gates at coastal drainage outlets',
+        'Upgrade stormwater network to 100-year storm standard',
+        'Plant mangrove barriers as natural wave protection',
+      ],
+      industrial:        isAr ? [
+        'إنشاء خزانات ترسيب لفصل الملوثات قبل التصريف',
+        'توسيع شبكة الصرف الصناعي بسعة تصريف مضاعفة',
+        'تركيب بوابات تحكم آلية للحماية من الفيضانات العكسية',
+        'إنشاء خطوط فاصلة بين مياه الأمطار ومياه العمليات',
+      ] : [
+        'Build sedimentation tanks to filter pollutants before discharge',
+        'Expand industrial drainage network with doubled capacity',
+        'Install automated flood gates to prevent backflow',
+        'Create separate stormwater and process water networks',
+      ],
+      heavy_industrial:  isAr ? [
+        'إنشاء خندق احتجاز محيط بكل منشأة نفطية',
+        'تركيب نظام كشف وفصل الهيدروكربونات من مياه الأمطار',
+        'رفع منسوب الحواجز الترابية حول الخزانات',
+        'تركيب مستشعرات كيميائية في شبكة الصرف',
+      ] : [
+        'Build containment moat around each petrochemical facility',
+        'Install hydrocarbon detection & separation system',
+        'Raise earthen berm elevation around storage tanks',
+        'Install chemical sensors in drainage network',
+      ],
+      airport:           isAr ? [
+        'توسيع شبكة صرف المدارج وفق معيار ICAO Annex 14',
+        'إنشاء خزانات تحت المدارج لتخزين مياه الأمطار',
+        'تركيب نظام مراقبة ذكي لمستويات المياه على المدارج',
+        'تحسين انحدار المدارج والمرافئ لتسريع التصريف',
+      ] : [
+        'Upgrade runway drainage to ICAO Annex 14 standard',
+        'Build underground cisterns beneath runways for rainwater storage',
+        'Install smart water level monitoring on all runways',
+        'Re-grade runway/taxiway slopes for faster drainage',
+      ],
+      wadi:              isAr ? [
+        'توسيع مجرى الوادي وإزالة التعديات',
+        'إنشاء سدود تحويل لتوزيع السيول على مخزونات تغذية جوفية',
+        'زراعة أشجار على جانبي الوادي لتثبيت التربة',
+        'تركيب محطات قياس ذكية لمراقبة منسوب السيل',
+      ] : [
+        'Widen wadi channel & remove encroachments',
+        'Build diversion dams to distribute flows to recharge basins',
+        'Plant trees on wadi banks to stabilize soil',
+        'Install smart gauging stations for real-time flow monitoring',
+      ],
+      agricultural:      isAr ? [
+        'إنشاء خزانات حصاد مياه الأمطار للري التكميلي',
+        'تحويل شبكة الري للتنقيط لتقليل الفاقد',
+        'زراعة محاصيل مقاومة للفيضانات في المناطق المنخفضة',
+        'تركيب محطات طقس للإنذار المبكر للمزارعين',
+      ] : [
+        'Build rainwater harvesting cisterns for supplemental irrigation',
+        'Convert irrigation to drip system to reduce losses',
+        'Plant flood-resistant crops in low-lying areas',
+        'Install weather stations for early farmer warning',
+      ],
+      desert_remote:     isAr ? [
+        'إنشاء سدود ترابية لتجميع مياه السيول للتغذية الجوفية',
+        'تركيب شبكة مستشعرات IoT لمراقبة السيول عن بعد',
+        'تحسين طرق الصحراء بمصارف مرفوعة',
+        'تطوير خطط إخلاء للمجتمعات البدوية',
+      ] : [
+        'Build earthen dams to collect flash floods for groundwater recharge',
+        'Deploy IoT sensor network for remote wadi monitoring',
+        'Upgrade desert roads with raised drainage shoulders',
+        'Develop evacuation plans for Bedouin communities',
+      ],
+      heritage_cultural: isAr ? [
+        'تركيب نظام صرف خفي لا يؤثر على أسس المباني التراثية',
+        'رفع منسوب الأرضية حول المواقع التراثية',
+        'استخدام مواد بناء تقليدية مقاومة للماء',
+        'تطوير خطة إدارة مياه الأمطار وفق معايير UNESCO',
+      ] : [
+        'Install hidden drainage system that preserves heritage building foundations',
+        'Raise ground level around heritage sites',
+        'Use traditional water-resistant building materials for repairs',
+        'Develop UNESCO-compliant stormwater management plan',
+      ],
+      urban_commercial:  isAr ? [
+        'إنشاء خزانات احتجاز تحت الطرق والمواقف',
+        'تركيب مضخات ذكية في الطوابق السفلية مع تحكم آلي',
+        'إعادة تصميم شبكة صرف الشوارع التجارية',
+        'تركيب رصف مسامي في مواقف السيارات والساحات',
+      ] : [
+        'Build underground retention tanks beneath roads & parking',
+        'Install smart pumps in basements with automated control',
+        'Redesign commercial street drainage network',
+        'Install permeable paving in parking lots & plazas',
+      ],
+      urban_residential: isAr ? [
+        `توسعة شبكة الصرف السكنية بسعة ${Math.round(depth * 0.5)} مجمك/ثانية`,
+        'إنشاء خزانات احتجاز مياه أمطار تحت الطرق السكنية',
+        'تحسين انحدار الشوارع وتوجيه المياه للأودية',
+        'تركيب بوابات تحكم ذكية في نقاط صرف الأحياء السكنية',
+      ] : [
+        `Expand residential drainage network by ${Math.round(depth * 0.5)} m³/s`,
+        'Underground stormwater retention tanks beneath residential roads',
+        'Re-grade streets to direct water toward wadis',
+        'Smart control gates at residential drainage outlets',
+      ],
+    }[rType];
+
+    // حلول شاملة مخصصة
+    const comprehensiveSolutions: string[] = {
+      coastal_island:    isAr ? [
+        'نظام حماية ساحلي متكامل مع جدران بحرية وأراضي رطبة صناعية',
+        'رفع منسوب جميع المباني الجديدة بمقدار +1.5 متر فوق منسوب البحر',
+        'نظام صرف ذكي متكامل مع توقعات ارتفاع منسوب سطح البحر',
+        'تحويل مياه الأمطار لخزانات ذكية للري والتبريد',
+      ] : [
+        'Integrated coastal protection: sea walls + constructed wetlands',
+        'Raise all new building elevations +1.5m above sea level',
+        'Smart drainage integrated with sea level rise projections',
+        'Convert rainwater to smart storage for irrigation & cooling',
+      ],
+      industrial:        isAr ? [
+        'إعادة تخطيط شبكة صرف المنطقة الصناعية بمعيار 100 سنة',
+        'إنشاء محطة معالجة مياه أمطار صناعية لإعادة الاستخدام',
+        'نظام مراقبة ذكي لجودة مياه الصرف بمعايير البيئة',
+        'تحويل مياه الأمطار المعالجة للتبريد الصناعي',
+      ] : [
+        'Redesign industrial zone drainage to 100-year flood standard',
+        'Build industrial stormwater treatment plant for reuse',
+        'Smart water quality monitoring system for discharge compliance',
+        'Reuse treated stormwater for industrial cooling',
+      ],
+      heavy_industrial:  isAr ? [
+        'منظومة صرف مزدوجة كاملة فصل مياه الأمطار عن مياه العمليات',
+        'محطة معالجة متخصصة لفصل الهيدروكربونات وإعادة الاستخدام',
+        'رفع منسوب جميع المنشآت الحساسة فوق مستوى الفيضان المئوي',
+        'نظام إنذار مبكر متكامل مع مركز عمليات الطوارئ البيئية',
+      ] : [
+        'Full dual-drainage system separating stormwater from process water',
+        'Dedicated hydrocarbon treatment plant for stormwater reuse',
+        'Raise all sensitive facility elevations above 100-year flood level',
+        'Integrated early warning system linked to environmental emergency center',
+      ],
+      airport:           isAr ? [
+        'إعادة تصميم شبكة صرف المطار بمعيار ICAO للفيضان المئوي',
+        'نظام تحكم مركزي ذكي لإدارة مياه المطار بالكامل',
+        'خزانات تحت المدارج لتخزين مياه الأمطار وإعادة استخدامها',
+        'نظام إنذار مبكر متكامل مع توقعات الطقس والتشغيل',
+      ] : [
+        'Full airport drainage redesign to ICAO 100-year flood standard',
+        'Centralized smart water management for entire airport campus',
+        'Underground cisterns beneath runways for rainwater reuse',
+        'Integrated early warning system linked to ATC & operations',
+      ],
+      wadi:              isAr ? [
+        'مشروع إحياء الأودية الطبيعية وفق معايير IUCN',
+        'منظومة سدود متسلسلة لتحويل السيول لخزانات تغذية جوفية',
+        'إعادة تخطيط استخدام الأراضي على جانبي الوادي بمنطقة عازلة',
+        'نظام رصد متكامل مع محطات قياس وأقمار صناعية SAR',
+      ] : [
+        'Wadi restoration project per IUCN nature-based standards',
+        'Cascading dam system to divert flows to groundwater recharge',
+        'Rezone wadi banks as protected buffer zone (no construction)',
+        'Integrated monitoring with gauging stations & SAR satellites',
+      ],
+      agricultural:      isAr ? [
+        'مشروع حصاد مياه الأمطار على مستوى الإمارة لتغذية الزراعة',
+        'تحويل المزارع للزراعة المائية والمحاصيل المقاومة',
+        'نظام ري ذكي متكامل مع توقعات الطقس',
+        'تغذية جوفية منظمة عبر آبار حقن في المناطق الزراعية',
+      ] : [
+        'Emirate-wide rainwater harvesting for agricultural use',
+        'Convert farms to aquaculture & flood-resistant crops',
+        'Smart irrigation system integrated with weather forecasts',
+        'Managed aquifer recharge via injection wells in farm areas',
+      ],
+      desert_remote:     isAr ? [
+        'شبكة سدود ترابية متكاملة لتغذية طبقات المياه الجوفية',
+        'مشروع تغذية جوفية مدار بمنطقة ليوا وفق نموذج الإمارات',
+        'طرق صحراوية مرفوعة مع مصارف تصريف جانبية',
+        'نظام رصد متكامل عن بعد مع أقمار SAR وIoT',
+      ] : [
+        'Integrated earthen dam network for aquifer recharge',
+        'Liwa Managed Aquifer Recharge project per UAE model',
+        'Elevated desert roads with lateral drainage shoulders',
+        'Remote monitoring system with SAR satellites & IoT sensors',
+      ],
+      heritage_cultural: isAr ? [
+        'إعادة تصميم شبكة صرف المواقع التراثية وفق معايير UNESCO',
+        'رفع منسوب جميع المباني التراثية فوق مستوى الفيضان المئوي',
+        'نظام رصد متكامل لحماية المواقع التراثية',
+        'تحويل مياه الأمطار لخزانات تراثية للري والصيانة',
+      ] : [
+        'Redesign heritage site drainage per UNESCO standards',
+        'Raise all heritage buildings above 100-year flood level',
+        'Integrated monitoring system for heritage site protection',
+        'Convert rainwater to heritage cisterns for irrigation & maintenance',
+      ],
+      urban_commercial:  isAr ? [
+        'إعادة تصميم شبكة صرف المنطقة التجارية بمعيار 100 سنة',
+        'نظام تحكم مركزي ذكي لإدارة مياه الأمطار في المنطقة التجارية',
+        'خزانات احتجاز تحت الطرق لتخزين مياه الأمطار وإعادة استخدامها',
+        'رصف مسامي وأسطح خضراء في جميع المناطق التجارية',
+      ] : [
+        'Full commercial district drainage redesign to 100-year standard',
+        'Centralized smart water management for commercial zone',
+        'Underground retention tanks for stormwater reuse',
+        'Permeable paving & green roofs across all commercial areas',
+      ],
+      urban_residential: isAr ? [
+        'إعادة تصميم شبكة صرف الأحياء السكنية بمعيار 100 سنة',
+        'بنية تحتية خضراء وأحواض ترسيب طبيعية في الأحياء',
+        'نظام تحكم مركزي ذكي لإدارة مياه الأمطار في المناطق السكنية',
+        'خزانات تخزين مياه الأمطار للري والاستخدام المنزلي',
+      ] : [
+        'Full residential district drainage redesign to 100-year standard',
+        'Green infrastructure & natural sedimentation basins in neighborhoods',
+        'Centralized smart water management for residential zones',
+        'Stormwater storage tanks for garden irrigation & household use',
+      ],
+    }[rType];
+
+    // مراجع عالمية مخصصة
+    const globalRefs = {
+      coastal_island:    isAr ? 'هولندا Delta Works: حماية ساحلية لـ 10 ملايين شخص بتكلفة €8 مليار' : 'Netherlands Delta Works: coastal protection for 10M people, €8B cost',
+      industrial:        isAr ? 'سنغافورة Jurong Island: صفر تسرب صناعي في فيضانات 2023' : 'Singapore Jurong Island: zero industrial discharge in 2023 floods',
+      heavy_industrial:  isAr ? 'هيوستن Ship Channel: فصل مياه الأمطار عن النفط بعد Hurricane Harvey 2017' : 'Houston Ship Channel: stormwater/oil separation after Hurricane Harvey 2017',
+      airport:           isAr ? 'مطار شانغي: تخزين 2.5 مليون مجمك/سنة من مياه الأمطار للعمليات' : 'Changi Airport: 2.5M m³/year stormwater harvested for operations',
+      wadi:              isAr ? 'الإمارات: مشروع أودية الفجيرة خفض الفيضانات 75% وحصد 50 مليون مجمك/سنة' : 'UAE Fujairah Wadi Project: 75% flood reduction, 50M m³/year harvested',
+      agricultural:      isAr ? 'الإمارات: مشروع تغذية المياه الجوفية في العين — 50 مليون مجمك/سنة' : 'UAE Al Ain MAR project: 50M m³/year groundwater recharge from farms',
+      desert_remote:     isAr ? 'ليوا MAR: حصاد سيول صحراوي يغذي 40 مليون مجمك/سنة في طبقات المياه الجوفية' : 'Liwa MAR: desert flash flood harvesting recharges 40M m³/year aquifer',
+      heritage_cultural: isAr ? 'فينيسيا MOSE: حماية التراث من الفيضانات بتكلفة €5.5 مليار' : 'Venice MOSE: heritage flood protection system, €5.5B investment',
+      urban_commercial:  isAr ? 'دبي 2024: نظام صرف ذكي في مركز دبي المالي خفض الفيضانات 85%' : 'Dubai 2024: DIFC smart drainage reduced flooding by 85%',
+      urban_residential: isAr ? 'محمد بن زايد: مشروع صرف أمطار أبوظبي خفض الفيضانات السكنية 70% بعد 2024' : 'MBZ City: Abu Dhabi residential stormwater project reduced flooding 70% post-2024',
+    }[rType];
+
     return [
       {
         id: 'quick' as const,
         label: isAr ? 'استجابة سريعة' : 'Quick Response',
         timeframe: isAr ? '1–7 أيام' : '1–7 days',
-        color: '#F59E0B',
-        icon: '⚡',
-        costMin: Math.round(scale * baseCostPerKm2 * 0.1),
-        costMax: Math.round(scale * baseCostPerKm2 * 0.3),
-        solutions: [
-          isAr ? 'نشر مضخات مياه محمولة (سعة 500–2000 م³/ساعة)' : 'Deploy mobile pumps (500–2,000 m³/hr capacity)',
-          isAr ? 'حواجز مؤقتة لتحويل مسار المياه' : 'Temporary flood barriers to redirect water flow',
-          isAr ? 'تنظيف مداخل الصرف المسدودة' : 'Clear blocked drainage inlets',
-          isAr ? 'تحذيرات إخلاء للمناطق المنخفضة' : 'Evacuation warnings for low-lying zones',
-        ],
+        color: '#F59E0B', icon: '⚡',
+        costMin: Math.round(scale * costFactor * 0.1),
+        costMax: Math.round(scale * costFactor * 0.3),
+        solutions: quickSolutions,
         globalRef: isAr ? 'دبي 2024: نشر 200 مضخة خلال 6 ساعات' : 'Dubai 2024: 200 pumps deployed within 6 hours',
         reduction: '40–60%',
       },
@@ -601,37 +965,22 @@ function SubAreaSolutions({ area, isAr }: { area: LiveSubArea; isAr: boolean }) 
         id: 'medium' as const,
         label: isAr ? 'حل متوسط المدى' : 'Medium-Term Solution',
         timeframe: isAr ? '3–12 شهر' : '3–12 months',
-        color: '#42A5F5',
-        icon: '🔧',
-        costMin: Math.round(scale * baseCostPerKm2 * 0.8),
-        costMax: Math.round(scale * baseCostPerKm2 * 2.0),
-        solutions: [
-          isAr ? `توسعة شبكة الصرف بسعة ${Math.round(depth * 0.5)} م³/ثانية` : `Expand drainage network by ${Math.round(depth * 0.5)} m³/s`,
-          isAr ? 'إنشاء خزانات احتجاز مياه أمطار تحت الأرض' : 'Underground stormwater retention tanks',
-          isAr ? 'تحسين انحدار الطرق وتوجيه المياه للأودية' : 'Road re-grading to direct water to wadis',
-          isAr ? 'تركيب بوابات تحكم ذكية في نقاط الصرف' : 'Smart control gates at drainage outlets',
-          isAr ? 'تحسين الغطاء النباتي لامتصاص المياه' : 'Vegetation enhancement for water absorption',
-        ],
-        globalRef: isAr ? 'سنغافورة: نفق ABC Waters يخزن 280,000 م³' : 'Singapore ABC Waters tunnel stores 280,000 m³',
+        color: '#42A5F5', icon: '🔧',
+        costMin: Math.round(scale * costFactor * 0.8),
+        costMax: Math.round(scale * costFactor * 2.0),
+        solutions: mediumSolutions,
+        globalRef: globalRefs,
         reduction: '65–80%',
       },
       {
         id: 'comprehensive' as const,
         label: isAr ? 'حل شامل ودائم' : 'Comprehensive Solution',
         timeframe: isAr ? '2–5 سنوات' : '2–5 years',
-        color: '#66BB6A',
-        icon: '🏗️',
-        costMin: Math.round(scale * baseCostPerKm2 * 3.0),
-        costMax: Math.round(scale * baseCostPerKm2 * 8.0),
-        solutions: [
-          isAr ? 'إعادة تصميم شبكة الصرف وفق معايير 100 سنة' : 'Full drainage redesign to 100-year flood standard',
-          isAr ? 'إنشاء مناطق تخضير وأحواض ترسيب طبيعية' : 'Green infrastructure & natural sedimentation basins',
-          isAr ? 'نظام تحكم مركزي ذكي لإدارة المياه' : 'Centralized smart water management system',
-          isAr ? 'خزانات تخزين مياه الأمطار للاستخدام المزدوج' : 'Dual-use stormwater storage reservoirs',
-          isAr ? 'تطوير أراضٍ رطبة صناعية لتصفية وتخزين المياه' : 'Constructed wetlands for treatment & storage',
-          isAr ? 'تحسين نفاذية الأسطح الحضرية (رصف مسامي)' : 'Permeable pavement & urban surface permeability',
-        ],
-        globalRef: isAr ? 'هولندا Room for the River: خفض الفيضانات 90%' : "Netherlands 'Room for the River': 90% flood reduction",
+        color: '#66BB6A', icon: '🏗️',
+        costMin: Math.round(scale * costFactor * 3.0),
+        costMax: Math.round(scale * costFactor * 8.0),
+        solutions: comprehensiveSolutions,
+        globalRef: globalRefs,
         reduction: '85–95%',
       },
     ];

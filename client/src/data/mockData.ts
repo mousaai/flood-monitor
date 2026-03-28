@@ -15,6 +15,19 @@
 
 export type AlertLevel = 'safe' | 'watch' | 'warning' | 'critical';
 
+// تصنيف طبيعة المنطقة لتخصيص الحلول الهندسية المناسبة
+export type RegionType =
+  | 'urban_residential'   // سكني حضري: شبكات صرف، رصف مسامي
+  | 'urban_commercial'    // تجاري/فندقي: صرف ذكي، تجميع أسطح
+  | 'coastal_island'      // جزيرة ساحلية: حواجز بحرية، رفع منسوب
+  | 'industrial'          // صناعي: خزانات ترسيب، فصل ملوثات
+  | 'heavy_industrial'    // صناعي ثقيل/نفطي: فصل نفط-ماء، احتجاز
+  | 'agricultural'        // زراعي/مزارع: حصاد مياه، ري بالتنقيط
+  | 'wadi'                // أودية: تعريض، سدود تحويل، غابات مانعة
+  | 'airport'             // مطار: تصريف تحت المدرج، خزانات طوارئ
+  | 'desert_remote'       // صحراوي/نائي: سدود ترابية، تغذية جوفية
+  | 'heritage_cultural';  // تراثي/ثقافي: حماية مواقع، صرف تحت الأرض
+
 export interface Region {
   id: string;
   nameAr: string;
@@ -29,6 +42,7 @@ export interface Region {
   population: number;
   area: number;
   rainfallSource?: string;
+  regionType?: RegionType;
 }
 
 export interface SatellitePass {
