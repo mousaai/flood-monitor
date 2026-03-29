@@ -171,6 +171,29 @@
       };
       // Fallback: hide after 20s if React fails silently
       setTimeout(window.__hideLoader, 20000);
+
+      // ── Visible error reporter for iOS Safari debugging ──
+      window.__showError = function(msg, src, line) {
+        var loader = document.getElementById('app-loader');
+        if (loader) {
+          loader.innerHTML = '<div style="padding:24px;max-width:90vw;">' +
+            '<div style="color:#ff6b35;font-size:18px;font-weight:bold;margin-bottom:12px;">⚠️ خطأ في التطبيق</div>' +
+            '<div style="color:#e8f4f8;font-size:13px;word-break:break-all;background:#0d1b2a;padding:12px;border-radius:8px;margin-bottom:8px;">' + (msg || 'Unknown error') + '</div>' +
+            '<div style="color:#546e7a;font-size:11px;">' + (src || '') + ' line ' + (line || '') + '</div>' +
+            '<button onclick="location.reload()" style="margin-top:16px;padding:10px 20px;background:#42a5f5;color:#0a1520;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">🔄 إعادة التحميل</button>' +
+            '</div>';
+          loader.style.opacity = '1';
+          loader.style.display = 'flex';
+        }
+      };
+      window.onerror = function(msg, src, line, col, err) {
+        window.__showError(msg + (err ? ' | ' + err.message : ''), src, line);
+        return false;
+      };
+      window.addEventListener('unhandledrejection', function(e) {
+        var msg = e.reason ? (e.reason.message || String(e.reason)) : 'Unhandled Promise Rejection';
+        window.__showError('Promise Error: ' + msg, '', '');
+      });
     </script>
     <script type="module" src="/src/main.tsx"></script>
     <script
