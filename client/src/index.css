@@ -39,27 +39,88 @@
   --color-ring: var(--ring);
   --radius: 4px;
 
-  /* ── Geological Dark Palette (OKLCH) ── */
-  --background:        oklch(0.12 0.025 240);   /* #0D1B2A deep ocean */
-  --foreground:        oklch(0.92 0.008 200);   /* #E8F4F8 ice white */
-  --card:              oklch(0.16 0.022 235);   /* #152233 */
+  /* ── Geological Dark Palette — hex fallbacks first (iOS Safari <15.4 compat), then oklch ── */
+  --background:        #0d1b2a;   /* deep ocean — fallback */
+  --background:        oklch(0.12 0.025 240);
+  --foreground:        #e8f4f8;   /* ice white — fallback */
+  --foreground:        oklch(0.92 0.008 200);
+  --card:              #152233;   /* fallback */
+  --card:              oklch(0.16 0.022 235);
+  --card-foreground:   #e6f0f6;   /* fallback */
   --card-foreground:   oklch(0.90 0.008 200);
+  --popover:           #121f30;   /* fallback */
   --popover:           oklch(0.14 0.024 237);
+  --popover-foreground: #e6f0f6;  /* fallback */
   --popover-foreground: oklch(0.90 0.008 200);
-  --primary:           oklch(0.65 0.18 210);    /* #42A5F5 water blue */
+  --primary:           #42a5f5;   /* water blue — fallback */
+  --primary:           oklch(0.65 0.18 210);
+  --primary-foreground: #0a1520;  /* fallback */
   --primary-foreground: oklch(0.10 0.02 240);
+  --secondary:         #1e3048;   /* fallback */
   --secondary:         oklch(0.20 0.020 230);
+  --secondary-foreground: #ccd9e0; /* fallback */
   --secondary-foreground: oklch(0.80 0.010 200);
+  --muted:             #1a2c40;   /* fallback */
   --muted:             oklch(0.18 0.018 235);
+  --muted-foreground:  #6b8fa8;   /* fallback */
   --muted-foreground:  oklch(0.55 0.018 220);
-  --accent:            oklch(0.68 0.16 195);    /* #4DD0E1 teal */
+  --accent:            #4dd0e1;   /* teal — fallback */
+  --accent:            oklch(0.68 0.16 195);
+  --accent-foreground: #0a1520;   /* fallback */
   --accent-foreground: oklch(0.10 0.02 240);
-  --destructive:       oklch(0.62 0.22 30);     /* #FF6B35 lava orange */
+  --destructive:       #ff6b35;   /* lava orange — fallback */
+  --destructive:       oklch(0.62 0.22 30);
+  --border:            #1e3048;   /* fallback */
   --border:            oklch(0.22 0.020 235);
+  --input:             #1e3048;   /* fallback */
   --input:             oklch(0.20 0.020 235);
+  --ring:              #42a5f5;   /* fallback */
   --ring:              oklch(0.65 0.18 210);
 }
-
+/* ── iOS Safari <15.4 fallback: define --background etc. as hex in :root ── */
+:root {
+  --background:        #0d1b2a;
+  --foreground:        #e8f4f8;
+  --card:              #152233;
+  --card-foreground:   #e6f0f6;
+  --popover:           #121f30;
+  --popover-foreground: #e6f0f6;
+  --primary:           #42a5f5;
+  --primary-foreground: #0a1520;
+  --secondary:         #1e3048;
+  --secondary-foreground: #ccd9e0;
+  --muted:             #1a2c40;
+  --muted-foreground:  #6b8fa8;
+  --accent:            #4dd0e1;
+  --accent-foreground: #0a1520;
+  --destructive:       #ff6b35;
+  --border:            #1e3048;
+  --input:             #1e3048;
+  --ring:              #42a5f5;
+}
+/* Override with oklch for browsers that support it (Safari 15.4+, Chrome 111+) */
+@supports (color: oklch(0 0 0)) {
+  :root {
+    --background:        oklch(0.12 0.025 240);
+    --foreground:        oklch(0.92 0.008 200);
+    --card:              oklch(0.16 0.022 235);
+    --card-foreground:   oklch(0.90 0.008 200);
+    --popover:           oklch(0.14 0.024 237);
+    --popover-foreground: oklch(0.90 0.008 200);
+    --primary:           oklch(0.65 0.18 210);
+    --primary-foreground: oklch(0.10 0.02 240);
+    --secondary:         oklch(0.20 0.020 230);
+    --secondary-foreground: oklch(0.80 0.010 200);
+    --muted:             oklch(0.18 0.018 235);
+    --muted-foreground:  oklch(0.55 0.018 220);
+    --accent:            oklch(0.68 0.16 195);
+    --accent-foreground: oklch(0.10 0.02 240);
+    --destructive:       oklch(0.62 0.22 30);
+    --border:            oklch(0.22 0.020 235);
+    --input:             oklch(0.20 0.020 235);
+    --ring:              oklch(0.65 0.18 210);
+  }
+}
 @layer base {
   * { border-color: var(--color-border); }
   body {
