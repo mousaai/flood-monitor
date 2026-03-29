@@ -52,10 +52,20 @@ const trpcClient = trpc.createClient({
   ],
 });
 
-createRoot(document.getElementById("root")!).render(
+const root = createRoot(document.getElementById("root")!);
+root.render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>
     <QueryClientProvider client={queryClient}>
       <App />
     </QueryClientProvider>
   </trpc.Provider>
 );
+
+// Hide the instant loading screen once React has mounted
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    if (typeof (window as any).__hideLoader === 'function') {
+      (window as any).__hideLoader();
+    }
+  });
+});

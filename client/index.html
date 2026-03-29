@@ -43,10 +43,69 @@
         color: #42A5F5 !important;
       }
       .leaflet-bar { border: 1px solid rgba(66,165,245,0.2) !important; }
+
+      /* Instant loading screen */
+      #app-loader {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: #0d1b2a;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        font-family: system-ui, -apple-system, sans-serif;
+        transition: opacity 0.4s ease;
+      }
+      #app-loader.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .loader-spinner {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        border: 3px solid rgba(66,165,245,0.15);
+        border-top-color: #42a5f5;
+        animation: loader-spin 0.9s linear infinite;
+        margin-bottom: 24px;
+      }
+      .loader-title {
+        color: #42a5f5;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: 3px;
+        margin-bottom: 8px;
+      }
+      .loader-sub {
+        color: #546e7a;
+        font-size: 13px;
+        letter-spacing: 1px;
+      }
+      @keyframes loader-spin { to { transform: rotate(360deg); } }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Instant loading screen shown before React hydrates -->
+      <div id="app-loader">
+        <div class="loader-spinner"></div>
+        <div class="loader-title">FloodSat AI</div>
+        <div class="loader-sub">جارٍ التحميل...</div>
+      </div>
+    </div>
+    <script>
+      // Hide loader once React mounts
+      window.__hideLoader = function() {
+        var el = document.getElementById('app-loader');
+        if (el) {
+          el.classList.add('hidden');
+          setTimeout(function() { el.remove(); }, 500);
+        }
+      };
+      // Fallback: hide after 15s if React fails silently
+      setTimeout(window.__hideLoader, 15000);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
     <script
       defer
