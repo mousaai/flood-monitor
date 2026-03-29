@@ -439,7 +439,12 @@ export default function UnifiedMapPage() {
     // Initial load
     loadRoadTier('tier1', ROAD_CDN.tier1, map, L);
 
-    return () => { map.remove(); leafletMapRef.current = null; };
+    // Fix map size on mobile: invalidate after mount and on container resize
+    setTimeout(() => { map.invalidateSize(); }, 150);
+    setTimeout(() => { map.invalidateSize(); }, 600);
+    const ro = new ResizeObserver(() => { map.invalidateSize(); });
+    if (mapRef.current) ro.observe(mapRef.current);
+    return () => { ro.disconnect(); map.remove(); leafletMapRef.current = null; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Map style toggle ──────────────────────────────────────────────────────
