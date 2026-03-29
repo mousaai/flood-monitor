@@ -58,7 +58,24 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Add CORS headers for JS/CSS assets so iOS Safari can load
+  // <script type="module" crossorigin> without CORS failure.
+  // iOS Safari sends Sec-Fetch-Mode: cors even for same-origin module scripts,
+  // and silently refuses to execute scripts without Access-Control-Allow-Origin.
+  app.use("/assets", (_req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+  });
+
+  app.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+      // Ensure JS files are served with correct MIME type
+      if (filePath.endsWith(".js")) {
+        res.setHeader("Content-Type", "application/javascript; charset=UTF-8");
+      }
+    },
+  }));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
