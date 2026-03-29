@@ -205,52 +205,15 @@ export default defineConfig({
     target: ['es2019', 'safari13', 'chrome87', 'firefox78'],
     // Ensure CSS is compatible with iOS Safari
     cssTarget: ['safari13', 'chrome87'],
+    // Disable modulePreload polyfill — __vite__mapDeps uses const self-reference
+    // in default parameter which causes TDZ error on iOS Safari < 15
+    modulePreload: { polyfill: false },
     rollupOptions: {
       output: {
-        // Split vendor libraries into separate chunks
-        // This reduces the main bundle size significantly for iOS Safari
-        manualChunks(id) {
-          // React core — small, keep together
-          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
-            return 'react-core';
-          }
-          // Sonner toast library — 127 occurrences in main bundle
-          if (id.includes('node_modules/sonner')) {
-            return 'vendor-sonner';
-          }
-          // Lucide icons — 53 occurrences in main bundle
-          if (id.includes('node_modules/lucide-react')) {
-            return 'vendor-lucide';
-          }
-          // Radix UI components
-          if (id.includes('node_modules/@radix-ui')) {
-            return 'vendor-radix';
-          }
-          // tRPC + tanstack query
-          if (id.includes('node_modules/@trpc') || id.includes('node_modules/@tanstack')) {
-            return 'vendor-trpc';
-          }
-          // Recharts charts library
-          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) {
-            return 'vendor-charts';
-          }
-          // Leaflet maps
-          if (id.includes('node_modules/leaflet') || id.includes('node_modules/react-leaflet')) {
-            return 'vendor-leaflet';
-          }
-          // next-themes
-          if (id.includes('node_modules/next-themes')) {
-            return 'vendor-themes';
-          }
-          // wouter router
-          if (id.includes('node_modules/wouter')) {
-            return 'vendor-router';
-          }
-          // superjson
-          if (id.includes('node_modules/superjson')) {
-            return 'vendor-superjson';
-          }
-        },
+        // NO manualChunks — all vendor libs bundled into main bundle
+        // iOS Safari fails silently when static ES module imports fail to load
+        // (CORS, network timeout, or parse error in any chunk = entire app fails)
+        // By keeping everything in one bundle, we eliminate all dependency chain failures
       },
     },
   },
