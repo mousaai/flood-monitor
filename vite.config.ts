@@ -5,7 +5,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
-import postcssPresetEnv from "postcss-preset-env";
 
 // =============================================================================
 // Manus Debug Collector - Vite Plugin
@@ -155,24 +154,6 @@ const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(
 
 export default defineConfig({
   plugins,
-  // PostCSS: convert modern CSS to iOS Safari 13+ compatible fallbacks
-  // color-mix() -> rgba(), oklch() -> rgb(), @property -> fallbacks
-  css: {
-    postcss: {
-      plugins: [
-        postcssPresetEnv({
-          // Stage 1 automatically converts:
-          // - oklch() -> rgb() for iOS Safari < 15.4
-          // - color-mix() -> rgba() for iOS Safari < 16.2
-          // - @property -> fallbacks for iOS Safari < 16.4
-          stage: 1,
-          // Disable custom-properties transform — CSS vars work on iOS 10+
-          features: { 'custom-properties': false },
-          browsers: ['safari >= 13', 'ios_saf >= 13'],
-        }),
-      ],
-    },
-  },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
