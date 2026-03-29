@@ -23,6 +23,14 @@ class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: { componentStack: string }) {
     console.error("[ErrorBoundary caught]", error.message, info.componentStack?.substring(0, 300));
     this.setState({ errorInfo: info.componentStack });
+    // Show error in loader div as fallback for iOS Safari
+    if (typeof (window as any).__showError === 'function') {
+      (window as any).__showError(
+        'React Component Error: ' + error.message + '\n\nStack: ' + (info.componentStack || '').substring(0, 300),
+        '',
+        ''
+      );
+    }
   }
 
   render() {
