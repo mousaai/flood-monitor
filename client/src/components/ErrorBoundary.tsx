@@ -1,5 +1,3 @@
-import { cn } from "@/lib/utils";
-import { AlertTriangle, RotateCcw } from "lucide-react";
 import { Component, ReactNode } from "react";
 
 interface Props {
@@ -9,46 +7,92 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  errorInfo: string | null;
 }
 
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, errorInfo: null };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: { componentStack: string }) {
+    console.error("[ErrorBoundary caught]", error.message, info.componentStack?.substring(0, 300));
+    this.setState({ errorInfo: info.componentStack });
   }
 
   render() {
     if (this.state.hasError) {
+      // Use hardcoded inline styles — no CSS variables, no Tailwind
+      // This ensures visibility on ALL browsers including iOS Safari
       return (
-        <div className="flex items-center justify-center min-h-screen p-8 bg-background">
-          <div className="flex flex-col items-center w-full max-w-2xl p-8">
-            <AlertTriangle
-              size={48}
-              className="text-destructive mb-6 flex-shrink-0"
-            />
-
-            <h2 className="text-xl mb-4">An unexpected error occurred.</h2>
-
-            <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
-              <pre className="text-sm text-muted-foreground whitespace-break-spaces">
-                {this.state.error?.stack}
-              </pre>
-            </div>
-
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          padding: '24px',
+          backgroundColor: '#0d1b2a',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '600px',
+            backgroundColor: '#152233',
+            border: '1px solid #ff6b35',
+            borderRadius: '12px',
+            padding: '32px',
+            color: '#e8f4f8',
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px', textAlign: 'center' }}>⚠️</div>
+            <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '12px', color: '#ff6b35' }}>
+              Application Error
+            </h2>
+            <p style={{ fontSize: '14px', color: '#90caf9', marginBottom: '16px' }}>
+              {this.state.error?.message || 'An unexpected error occurred'}
+            </p>
+            {this.state.error?.stack && (
+              <div style={{
+                backgroundColor: '#0d1b2a',
+                borderRadius: '8px',
+                padding: '12px',
+                marginBottom: '16px',
+                overflowX: 'auto',
+              }}>
+                <pre style={{
+                  fontSize: '11px',
+                  color: '#6b8fa8',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  margin: 0,
+                }}>
+                  {this.state.error.stack.substring(0, 600)}
+                </pre>
+              </div>
+            )}
             <button
               onClick={() => window.location.reload()}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded",
-                "bg-primary text-primary-foreground",
-                "hover:opacity-90 cursor-pointer"
-              )}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 20px',
+                backgroundColor: '#42a5f5',
+                color: '#0a1520',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                width: '100%',
+                justifyContent: 'center',
+              }}
             >
-              <RotateCcw size={16} />
-              Reload Page
+              🔄 Reload Page
             </button>
           </div>
         </div>
