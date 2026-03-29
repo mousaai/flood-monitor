@@ -12,7 +12,7 @@ import { DataModeProvider } from "./contexts/DataModeContext";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import { useIsMobile } from "./hooks/useMobile";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 
 // ── Lazy-loaded pages — only loaded when navigated to ──
 const Dashboard         = lazy(() => import("./pages/Dashboard"));
@@ -41,14 +41,15 @@ function PageLoader() {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '60vh', color: '#42a5f5', fontSize: '14px', gap: '10px'
+      minHeight: '60vh', color: '#42a5f5', fontSize: '14px', gap: '10px',
+      backgroundColor: '#0d1b2a',
     }}>
-      <div style={{
-        width: '20px', height: '20px', border: '2px solid #42a5f5',
-        borderTopColor: 'transparent', borderRadius: '50%',
-        animation: 'spin 0.8s linear infinite'
+      <div className="loader-spinner" style={{
+        width: '24px', height: '24px',
+        border: '2px solid rgba(66,165,245,0.2)',
+        borderTopColor: '#42a5f5', borderRadius: '50%',
       }} />
-      جارٍ التحميل...
+      <span>جارٍ التحميل...</span>
     </div>
   );
 }
@@ -143,6 +144,14 @@ function Router() {
 }
 
 export default function App() {
+  // Hide the loading screen once React has fully mounted and rendered
+  // This is the correct place — ensures loader hides AFTER React render completes
+  useEffect(() => {
+    if (typeof (window as any).__hideLoader === 'function') {
+      (window as any).__hideLoader();
+    }
+  }, []);
+
   return (
     <ErrorBoundary>
       <ThemeProvider>

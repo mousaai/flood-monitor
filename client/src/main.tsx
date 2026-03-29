@@ -12,18 +12,21 @@ import "./index.css";
 // ── Visible error helper (shows error on screen for iOS Safari debugging) ──
 function showFatalError(stage: string, err: unknown) {
   const msg = err instanceof Error
-    ? err.message + '\n' + (err.stack || '').substring(0, 400)
+    ? err.message + '\n\nStack:\n' + (err.stack || '').substring(0, 500)
     : String(err);
-  const loader = document.getElementById('app-loader');
-  if (loader) {
-    loader.innerHTML =
-      '<div style="padding:24px;max-width:90vw;font-family:system-ui,-apple-system,sans-serif;">' +
-      '<div style="color:#ff6b35;font-size:18px;font-weight:bold;margin-bottom:12px;">⚠️ خطأ: ' + stage + '</div>' +
-      '<div style="color:#e8f4f8;font-size:12px;word-break:break-all;white-space:pre-wrap;background:#0d1b2a;padding:12px;border-radius:8px;margin-bottom:8px;">' + msg + '</div>' +
-      '<button onclick="location.reload()" style="margin-top:16px;padding:10px 20px;background:#42a5f5;color:#0a1520;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">🔄 إعادة التحميل</button>' +
+  if (typeof (window as any).__showError === 'function') {
+    (window as any).__showError('Fatal Error [' + stage + ']: ' + msg, '', '');
+  } else {
+    // Fallback: create error overlay directly
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#0d1b2a;display:flex;align-items:center;justify-content:center;z-index:99999;font-family:system-ui,-apple-system,sans-serif;padding:24px;';
+    overlay.innerHTML =
+      '<div style="max-width:90vw;">' +
+      '<div style="color:#ff6b35;font-size:18px;font-weight:bold;margin-bottom:12px;">⚠️ ' + stage + '</div>' +
+      '<div style="color:#e8f4f8;font-size:12px;word-break:break-all;white-space:pre-wrap;background:#0a1520;padding:12px;border-radius:8px;margin-bottom:12px;">' + msg + '</div>' +
+      '<button onclick="location.reload()" style="padding:10px 20px;background:#42a5f5;color:#0a1520;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;width:100%;">🔄 إعادة التحميل</button>' +
       '</div>';
-    loader.style.opacity = '1';
-    loader.style.display = 'flex';
+    document.body.appendChild(overlay);
   }
 }
 
@@ -31,7 +34,14 @@ let queryClient: QueryClient;
 let trpcClient: ReturnType<typeof trpc.createClient>;
 
 try {
-  queryClient = new QueryClient();
+  queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: 1,
+        retryDelay: 1000,
+      },
+    },
+  });
 
   const redirectToLoginIfUnauthorized = (error: unknown) => {
     if (!(error instanceof TRPCClientError)) return;
@@ -89,14 +99,9 @@ try {
     </trpc.Provider>
   );
 
-  // Hide the instant loading screen once React has mounted
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      if (typeof (window as any).__hideLoader === 'function') {
-        (window as any).__hideLoader();
-      }
-    });
-  });
+  // NOTE: __hideLoader is now called from App.tsx useEffect
+  // to ensure it only hides AFTER React has fully rendered
+  // This prevents the white screen caused by hiding loader before render completes
 } catch (e) {
   showFatalError('تحميل React', e);
 }

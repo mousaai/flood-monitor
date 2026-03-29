@@ -167,7 +167,11 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
-    target: ['es2020', 'safari14', 'chrome90', 'firefox90'],
+    // Target iOS Safari 13+ (covers iOS 13-18)
+    // es2019 ensures compatibility with older Safari versions
+    target: ['es2019', 'safari13', 'chrome87', 'firefox78'],
+    // Ensure CSS is compatible with iOS Safari
+    cssTarget: ['safari13', 'chrome87'],
   },
   server: {
     host: true,
