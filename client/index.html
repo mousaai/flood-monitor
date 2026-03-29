@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <meta name="theme-color" content="#0d1b2a" />
     <title>FloodSat AI — منصة الرصد الذكي للفيضانات | أبوظبي</title>
     <meta name="description" content="منصة متكاملة لرصد تجمعات مياه الأمطار والفيضانات في إمارة أبوظبي عبر الأقمار الصناعية والذكاء الاصطناعي" />
 
@@ -13,6 +14,71 @@
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- iOS Safari Polyfills — MUST run before any JS bundle -->
+    <script>
+      // Array.prototype.at — Safari < 15.4
+      if (!Array.prototype.at) {
+        Array.prototype.at = function(i) {
+          var n = this.length, r = i < 0 ? n + i : i;
+          return r >= 0 && r < n ? this[r] : undefined;
+        };
+      }
+      // String.prototype.at — Safari < 15.4
+      if (!String.prototype.at) {
+        String.prototype.at = function(i) {
+          var n = this.length, r = i < 0 ? n + i : i;
+          return r >= 0 && r < n ? this[r] : undefined;
+        };
+      }
+      // Object.hasOwn — Safari < 15.4
+      if (!Object.hasOwn) {
+        Object.hasOwn = function(obj, key) {
+          return Object.prototype.hasOwnProperty.call(obj, key);
+        };
+      }
+      // structuredClone — Safari < 15.4
+      if (typeof structuredClone === 'undefined') {
+        window.structuredClone = function(obj) {
+          return JSON.parse(JSON.stringify(obj));
+        };
+      }
+      // Array.prototype.findLast — Safari < 15.4
+      if (!Array.prototype.findLast) {
+        Array.prototype.findLast = function(fn) {
+          for (var i = this.length - 1; i >= 0; i--) {
+            if (fn(this[i], i, this)) return this[i];
+          }
+        };
+      }
+      // Array.prototype.findLastIndex — Safari < 15.4
+      if (!Array.prototype.findLastIndex) {
+        Array.prototype.findLastIndex = function(fn) {
+          for (var i = this.length - 1; i >= 0; i--) {
+            if (fn(this[i], i, this)) return i;
+          }
+          return -1;
+        };
+      }
+      // Array.prototype.toSorted — Safari < 16
+      if (!Array.prototype.toSorted) {
+        Array.prototype.toSorted = function(fn) {
+          return this.slice().sort(fn);
+        };
+      }
+      // Array.prototype.toReversed — Safari < 16
+      if (!Array.prototype.toReversed) {
+        Array.prototype.toReversed = function() {
+          return this.slice().reverse();
+        };
+      }
+      // Array.prototype.with — Safari < 16
+      if (!Array.prototype.with) {
+        Array.prototype.with = function(i, v) {
+          var a = this.slice(); a[i < 0 ? this.length + i : i] = v; return a;
+        };
+      }
+    </script>
 
     <style>
       /* Geological dark theme — Leaflet popup override */
@@ -103,8 +169,8 @@
           setTimeout(function() { el.remove(); }, 500);
         }
       };
-      // Fallback: hide after 15s if React fails silently
-      setTimeout(window.__hideLoader, 15000);
+      // Fallback: hide after 20s if React fails silently
+      setTimeout(window.__hideLoader, 20000);
     </script>
     <script type="module" src="/src/main.tsx"></script>
     <script
