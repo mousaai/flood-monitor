@@ -87,10 +87,15 @@ try {
 }
 
 try {
+  if (typeof (window as any).__debugStep === 'function') (window as any).__debugStep('JS bundle loaded');
+
   const rootEl = document.getElementById("root");
   if (!rootEl) throw new Error('لم يتم العثور على عنصر #root في الصفحة');
 
+  if (typeof (window as any).__debugStep === 'function') (window as any).__debugStep('createRoot...');
   const root = createRoot(rootEl);
+
+  if (typeof (window as any).__debugStep === 'function') (window as any).__debugStep('root.render()...');
   root.render(
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
@@ -98,10 +103,10 @@ try {
       </QueryClientProvider>
     </trpc.Provider>
   );
+  if (typeof (window as any).__debugStep === 'function') (window as any).__debugStep('render() called ✔');
 
   // NOTE: __hideLoader is now called from App.tsx useEffect
   // to ensure it only hides AFTER React has fully rendered
-  // This prevents the white screen caused by hiding loader before render completes
 } catch (e) {
   showFatalError('تحميل React', e);
 }

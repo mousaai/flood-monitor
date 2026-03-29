@@ -207,24 +207,31 @@ function Router() {
   );
 }
 
+// ── Debug step helper ──
+const dbg = (step: string) => {
+  if (typeof (window as any).__debugStep === 'function') (window as any).__debugStep(step);
+};
+
 export default function App() {
   // Hide the loading screen once React has fully mounted
-  // Note: Also called in PageLoader for the case when Suspense is waiting
   useEffect(() => {
+    dbg('App mounted ✔');
     if (typeof (window as any).__hideLoader === 'function') {
       (window as any).__hideLoader();
     }
   }, []);
+
+  dbg('App() render start');
 
   return (
     <ErrorBoundary>
       <ThemeProvider>
         <LanguageProvider>
           <DataModeProvider>
-          <TooltipProvider>
-            <Toaster position="top-left" />
-            <Router />
-          </TooltipProvider>
+            <TooltipProvider>
+              <Toaster position="top-left" />
+              <Router />
+            </TooltipProvider>
           </DataModeProvider>
         </LanguageProvider>
       </ThemeProvider>
