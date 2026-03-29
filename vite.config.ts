@@ -150,6 +150,27 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
+// Plugin to remove crossorigin attribute and modulepreload from production HTML
+// iOS Safari has known issues with <script type="module" crossorigin> and
+// <link rel="modulepreload" crossorigin> causing silent script execution failures
+function vitePluginSafariCompat(): Plugin {
+  return {
+    name: 'vite-plugin-safari-compat',
+    enforce: 'post',
+    transformIndexHtml(html) {
+      return html
+        // Remove crossorigin from script tags
+        .replace(/<script type="module" crossorigin/g, '<script type="module"')
+        // Remove modulepreload links entirely (not needed, causes issues on iOS Safari)
+        .replace(/<link rel="modulepreload" crossorigin[^>]+>/g, '')
+        // Remove modulepreload without crossorigin too
+        .replace(/<link rel="modulepreload"[^>]+>/g, '')
+        // Remove crossorigin from CSS stylesheet links
+        .replace(/<link rel="stylesheet" crossorigin/g, '<link rel="stylesheet"');
+    },
+  };
+}
+
 // vitePluginManusRuntime is excluded from production builds:
 // It bundles a full copy of React + renders its own root, causing a React conflict
 // on iOS Safari (two React instances fighting over #root = silent crash)
@@ -160,6 +181,8 @@ const plugins = [
   jsxLocPlugin(),
   ...(isDev ? [vitePluginManusRuntime({ injectTo: 'body-prepend' })] : []),
   vitePluginManusDebugCollector(),
+  // Remove crossorigin and modulepreload from production HTML for iOS Safari compat
+  ...(!isDev ? [vitePluginSafariCompat()] : []),
 ];
 
 export default defineConfig({
