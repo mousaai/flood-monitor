@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
-    "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "vite build && node scripts/fix-mapdeps-tdz.mjs && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
@@ -99,6 +99,7 @@
     "esbuild": "^0.25.0",
     "pnpm": "^10.15.1",
     "postcss": "^8.4.47",
+    "postcss-preset-env": "^11.2.0",
     "prettier": "^3.6.2",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.19.1",

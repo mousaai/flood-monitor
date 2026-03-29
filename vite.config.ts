@@ -150,6 +150,31 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
+// Plugin to fix __vite__mapDeps TDZ bug on iOS Safari < 15
+// Vite generates: const __vite__mapDeps=(i,m=__vite__mapDeps,...)
+// The self-reference in default parameter causes TDZ ReferenceError on iOS Safari < 15
+// because 'const' variables are in TDZ until fully initialized.
+// Fix: replace 'const __vite__mapDeps=' with 'var __vite__mapDeps='
+// 'var' is hoisted and has no TDZ, so self-reference in default param works fine.
+function vitePluginFixMapDepsTDZ(): Plugin {
+  return {
+    name: 'vite-plugin-fix-mapdeps-tdz',
+    enforce: 'post',
+    // renderChunk is called for each chunk BEFORE writing to disk
+    // This is the correct hook to transform chunk code in Rollup/Vite
+    renderChunk(code, chunk) {
+      if (code.includes('const __vite__mapDeps=')) {
+        console.log('[fix-mapdeps-tdz] Fixing TDZ in chunk:', chunk.fileName);
+        return {
+          code: code.replace(/const __vite__mapDeps=/g, 'var __vite__mapDeps='),
+          map: null,
+        };
+      }
+      return null;
+    },
+  };
+}
+
 // Plugin to remove crossorigin attribute and modulepreload from production HTML
 // iOS Safari has known issues with <script type="module" crossorigin> and
 // <link rel="modulepreload" crossorigin> causing silent script execution failures
@@ -174,18 +199,20 @@ function vitePluginSafariCompat(): Plugin {
 // vitePluginManusRuntime is excluded from production builds:
 // It bundles a full copy of React + renders its own root, causing a React conflict
 // on iOS Safari (two React instances fighting over #root = silent crash)
-const isDev = process.env.NODE_ENV !== 'production';
-const plugins = [
-  react(),
-  tailwindcss(),
-  jsxLocPlugin(),
-  ...(isDev ? [vitePluginManusRuntime({ injectTo: 'body-prepend' })] : []),
-  vitePluginManusDebugCollector(),
-  // Remove crossorigin and modulepreload from production HTML for iOS Safari compat
-  ...(!isDev ? [vitePluginSafariCompat()] : []),
-];
-
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const isDev = mode !== 'production';
+  const plugins = [
+    react(),
+    tailwindcss(),
+    jsxLocPlugin(),
+    ...(isDev ? [vitePluginManusRuntime({ injectTo: 'body-prepend' })] : []),
+    vitePluginManusDebugCollector(),
+    // Remove crossorigin and modulepreload from production HTML for iOS Safari compat
+    ...(!isDev ? [vitePluginSafariCompat()] : []),
+    // Fix __vite__mapDeps TDZ bug on iOS Safari < 15
+    ...(!isDev ? [vitePluginFixMapDepsTDZ()] : []),
+  ];
+  return {
   plugins,
   resolve: {
     alias: {
@@ -233,4 +260,5 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
+  };
 });
