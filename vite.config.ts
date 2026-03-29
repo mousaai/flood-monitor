@@ -150,7 +150,17 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+// vitePluginManusRuntime is excluded from production builds:
+// It bundles a full copy of React + renders its own root, causing a React conflict
+// on iOS Safari (two React instances fighting over #root = silent crash)
+const isDev = process.env.NODE_ENV !== 'production';
+const plugins = [
+  react(),
+  tailwindcss(),
+  jsxLocPlugin(),
+  ...(isDev ? [vitePluginManusRuntime({ injectTo: 'body-prepend' })] : []),
+  vitePluginManusDebugCollector(),
+];
 
 export default defineConfig({
   plugins,
