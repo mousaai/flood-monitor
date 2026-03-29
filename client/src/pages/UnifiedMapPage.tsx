@@ -8,7 +8,8 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import HistoricalWaterPanel from '@/components/HistoricalWaterPanel';
-import { HISTORICAL_REGIONS, LEVEL_COLORS, type HistoricalRegion } from '@/data/historicalWater';
+import HistoricalTimelineScrubber from '@/components/HistoricalTimelineScrubber';
+import { HISTORICAL_REGIONS, LEVEL_COLORS, FLOOD_EVENTS, type HistoricalRegion } from '@/data/historicalWater';
 import { FLOOD_ZONES, DRAINAGE_POINTS, DATA_ACCURACY, getZonesForZoom, type FloodZoneMulti } from '@/services/floodMapData';
 import { createFloodWaterLayer, type FloodWaterLayerInstance } from '@/components/FloodWaterLayer';
 import { useRealWeather } from '@/hooks/useRealWeather';
@@ -251,6 +252,9 @@ export default function UnifiedMapPage() {
   const [showBadge, setShowBadge] = useState(true);
   const [kpiModal, setKpiModal] = useState<DrillDownType | null>(null);
   const [showHistoricalPanel, setShowHistoricalPanel] = useState(false);
+  const [historicalMode, setHistoricalMode] = useState(false);           // true = showing historical timeline
+  const [historicalYear, setHistoricalYear] = useState(2024);            // selected year
+  const [historicalMonth, setHistoricalMonth] = useState(4);             // selected month (1-12)
   const [historicalEventActive, setHistoricalEventActive] = useState<{year: number; month: number} | null>(null);
   const historicalMarkersRef = useRef<any>(null);
 
@@ -292,14 +296,26 @@ export default function UnifiedMapPage() {
     }
   }, [timelineHours, timelineIndex]);
 
-  // Compute precipMultiplier from selected hour
+  // Compute precipMultiplier from selected hour (or historical event)
   useEffect(() => {
+    // ── Historical mode: derive multiplier from event precipitation ──
+    if (historicalMode) {
+      const ev = FLOOD_EVENTS.find(e => e.year === historicalYear && e.month === historicalMonth);
+      if (ev) {
+        // Map precip mm to multiplier: 0 mm→0.3, 50 mm→1.0, 100 mm→1.6, 254 mm→2.5
+        const mult = Math.max(0.3, Math.min(2.5, 0.3 + ev.max_mm * 0.0087));
+        setPrecipMultiplier(mult);
+      } else {
+        // No event this month → minimal water display
+        setPrecipMultiplier(0.15);
+      }
+      return;
+    }
+    // ── Live mode ──
     if (timelineHours.length === 0 || timelineIndex < 0) {
       if (data) {
-        // Use rainfall + probability together to change color even if rainfall is 0
         const maxP = Math.max(...data.regions.map((r: any) => r.currentPrecipitation));
         const maxRisk = Math.max(...data.regions.map((r: any) => r.floodRisk ?? 0));
-        // floodRisk 0-100 → multiplier 0.3-2.0
         const riskFactor = 0.3 + (maxRisk / 100) * 1.7;
         const precipFactor = 1 + maxP * 0.3;
         setPrecipMultiplier(Math.max(0.3, Math.min(2.5, Math.max(riskFactor, precipFactor))));
@@ -308,15 +324,13 @@ export default function UnifiedMapPage() {
     }
     const h = timelineHours[timelineIndex];
     if (!h) return;
-    // rainfall + probability → dynamic multiplier
-    const probFactor = (h.probability ?? 0) / 100; // 0-1
-    const precipVal = h.precipitation ?? 0; // mm
-    // if rainfall is 0 but probability is high → light blue color
+    const probFactor = (h.probability ?? 0) / 100;
+    const precipVal = h.precipitation ?? 0;
     const mult = precipVal > 0
       ? Math.max(0.5, Math.min(2.5, 0.5 + precipVal * 0.4 + probFactor * 0.5))
       : Math.max(0.3, Math.min(1.2, 0.3 + probFactor * 0.9));
     setPrecipMultiplier(mult);
-  }, [timelineIndex, timelineHours, data]);
+  }, [timelineIndex, timelineHours, data, historicalMode, historicalYear, historicalMonth]);
 
   // ── Toggle layer ──────────────────────────────────────────────────────────
   const toggleLayer = useCallback((key: LayerKey) => {
@@ -1438,13 +1452,25 @@ export default function UnifiedMapPage() {
             ))}
             {/* Historical Archive Button */}
             <button
-              onClick={() => setShowHistoricalPanel(p => !p)}
+              onClick={() => {
+                if (historicalMode) {
+                  // Already in historical mode — exit
+                  setHistoricalMode(false);
+                  setHistoricalEventActive(null);
+                } else {
+                  // Enter historical mode: default to April 2024 (most extreme event)
+                  setHistoricalMode(true);
+                  setHistoricalYear(2024);
+                  setHistoricalMonth(4);
+                  setHistoricalEventActive({ year: 2024, month: 4 });
+                }
+              }}
               title={lang === 'ar' ? 'الأرشيف التاريخي 2015-2025' : 'Historical Archive 2015-2025'}
               style={{
-                background: showHistoricalPanel ? 'rgba(251,191,36,0.2)' : historicalEventActive ? 'rgba(251,191,36,0.12)' : 'rgba(13,17,23,0.85)',
-                border: `1px solid ${showHistoricalPanel ? 'rgba(251,191,36,0.6)' : historicalEventActive ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                background: historicalMode ? 'rgba(251,191,36,0.2)' : 'rgba(13,17,23,0.85)',
+                border: `1px solid ${historicalMode ? 'rgba(251,191,36,0.6)' : 'rgba(255,255,255,0.1)'}`,
                 borderRadius: '6px', cursor: 'pointer',
-                color: showHistoricalPanel || historicalEventActive ? '#FBBF24' : '#475569',
+                color: historicalMode ? '#FBBF24' : '#475569',
                 padding: '4px 7px', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '3px',
                 fontFamily: 'Tajawal, sans-serif', whiteSpace: 'nowrap',
                 transition: 'all 0.2s ease',
@@ -1452,27 +1478,12 @@ export default function UnifiedMapPage() {
             >
               <span>🗓</span>
               <span>{lang === 'ar' ? 'تاريخي' : 'History'}</span>
-              {historicalEventActive && (
+              {historicalMode && (
                 <span style={{ fontSize: '8px', background: 'rgba(251,191,36,0.3)', borderRadius: '3px', padding: '1px 3px' }}>
-                  {historicalEventActive.year}
+                  {historicalYear}
                 </span>
               )}
             </button>
-            {/* Clear historical markers button */}
-            {historicalEventActive && (
-              <button
-                onClick={() => setHistoricalEventActive(null)}
-                style={{
-                  background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-                  borderRadius: '6px', cursor: 'pointer', color: '#EF4444',
-                  padding: '4px 7px', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '3px',
-                  fontFamily: 'Tajawal, sans-serif', whiteSpace: 'nowrap',
-                }}
-              >
-                <span>✕</span>
-                <span>{lang === 'ar' ? 'مسح' : 'Clear'}</span>
-              </button>
-            )}
           </div>
         </div>
 
@@ -1588,7 +1599,38 @@ export default function UnifiedMapPage() {
         )}
 
         {/* Timeline status badge */}
-        {showBadge && timelineHours.length > 0 && timelineIndex >= 0 && (() => {
+        {showBadge && (() => {
+          // Historical mode badge
+          if (historicalMode) {
+            const MONTHS_AR = ['','يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+            const MONTHS_EN = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const ev = FLOOD_EVENTS.find(e => e.year === historicalYear && e.month === historicalMonth);
+            const badgeColor = ev ? (
+              ev.severity === 'extreme' ? '#7C3AED' :
+              ev.severity === 'severe'  ? '#EF4444' :
+              ev.severity === 'high'    ? '#F97316' :
+              ev.severity === 'moderate'? '#F59E0B' : '#3B82F6'
+            ) : '#475569';
+            const monthLabel = lang === 'ar' ? MONTHS_AR[historicalMonth] : MONTHS_EN[historicalMonth];
+            return (
+              <div style={{
+                position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(13,17,23,0.92)', border: `1px solid ${badgeColor}55`,
+                borderRadius: '8px', padding: '5px 14px', zIndex: 1001,
+                display: 'flex', alignItems: 'center', gap: '8px',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
+              }}>
+                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: badgeColor }} />
+                <span style={{ fontSize: '11px', color: '#e2e8f0', fontFamily: 'Tajawal,sans-serif' }}>
+                  {monthLabel} {historicalYear}
+                  {ev ? ` — ${ev.max_mm} mm` : ''}
+                </span>
+                <span style={{ fontSize: '10px', fontWeight: 700, color: badgeColor }}>HIST</span>
+              </div>
+            );
+          }
+          // Live/forecast badge
+          if (!timelineHours.length || timelineIndex < 0) return null;
           const h = timelineHours[timelineIndex];
           if (!h) return null;
           const isNow = h.isNow;
@@ -1612,13 +1654,33 @@ export default function UnifiedMapPage() {
           );
          })()}
         {/* Timeline Scrubber — embedded inside map position:absolute */}
-        {showTimeline && timelineHours.length > 0 && (
-          <TimelineScrubber
-            hours={timelineHours}
-            currentIndex={timelineIndex}
-            onIndexChange={setTimelineIndex}
-            isLive={isLive}
+        {historicalMode ? (
+          <HistoricalTimelineScrubber
+            year={historicalYear}
+            selectedMonth={historicalMonth}
+            onMonthChange={(m) => {
+              setHistoricalMonth(m);
+              setHistoricalEventActive({ year: historicalYear, month: m });
+            }}
+            onYearChange={(y) => {
+              setHistoricalYear(y);
+              setHistoricalEventActive({ year: y, month: historicalMonth });
+            }}
+            onClose={() => {
+              setHistoricalMode(false);
+              setHistoricalEventActive(null);
+            }}
+            lang={lang as 'ar' | 'en'}
           />
+        ) : (
+          showTimeline && timelineHours.length > 0 && (
+            <TimelineScrubber
+              hours={timelineHours}
+              currentIndex={timelineIndex}
+              onIndexChange={setTimelineIndex}
+              isLive={isLive}
+            />
+          )
         )}
       </div>{/* end map div */}
       </div>{/* end right column */}
