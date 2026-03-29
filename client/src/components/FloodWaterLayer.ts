@@ -18,6 +18,7 @@
  *   Classic radial gradient blobs for overview zoom levels.
  */
 
+import L from 'leaflet';
 import { getHotspotsForZoomMerged, type FloodHotspot } from '@/data/floodHotspots';
 import { isInsideAbuDhabi, getUrbanDensity } from '@/data/abuDhabiBoundary';
 
@@ -231,7 +232,6 @@ export function createFloodWaterLayer(
   initialMultiplier = 1.0,
   initialLang: 'ar' | 'en' = 'ar'
 ): FloodWaterLayerInstance {
-  const L = (window as any).L;
   if (!L || !map) return { update: () => {}, remove: () => {} };
 
   const container: HTMLElement = map.getContainer();

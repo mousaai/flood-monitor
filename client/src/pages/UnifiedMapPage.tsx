@@ -5,6 +5,10 @@
  * Data: OSM Overpass API (410,348 Road) + Open-Meteo + Copernicus CEMS
  */
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import HistoricalWaterPanel from '@/components/HistoricalWaterPanel';
+import { HISTORICAL_REGIONS, LEVEL_COLORS, type HistoricalRegion } from '@/data/historicalWater';
 import { FLOOD_ZONES, DRAINAGE_POINTS, DATA_ACCURACY, getZonesForZoom, type FloodZoneMulti } from '@/services/floodMapData';
 import { createFloodWaterLayer, type FloodWaterLayerInstance } from '@/components/FloodWaterLayer';
 import { useRealWeather } from '@/hooks/useRealWeather';
@@ -246,6 +250,9 @@ export default function UnifiedMapPage() {
   const [showLegend, setShowLegend] = useState(true);
   const [showBadge, setShowBadge] = useState(true);
   const [kpiModal, setKpiModal] = useState<DrillDownType | null>(null);
+  const [showHistoricalPanel, setShowHistoricalPanel] = useState(false);
+  const [historicalEventActive, setHistoricalEventActive] = useState<{year: number; month: number} | null>(null);
+  const historicalMarkersRef = useRef<any>(null);
 
   const { data, isLive, lastUpdated, refresh } = useRealWeather();
 
@@ -387,8 +394,6 @@ export default function UnifiedMapPage() {
   // ── Init map ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!mapRef.current || leafletMapRef.current) return;
-    const L = (window as any).L;
-    if (!L) return;
 
     const map = L.map(mapRef.current, {
       zoomControl: false,
@@ -451,8 +456,6 @@ export default function UnifiedMapPage() {
   useEffect(() => {
     const map = leafletMapRef.current;
     if (!map) return;
-    const L = (window as any).L;
-    if (!L) return;
     if (mapStyle === 'satellite') {
       map._darkTile?.remove();
       map._satelliteTile?.addTo(map);
@@ -495,11 +498,56 @@ export default function UnifiedMapPage() {
     return () => { floodWaterLayerRef.current?.remove(); };
   }, []);
 
+  // ── Historical event markers on map ──────────────────────────────────────
+  useEffect(() => {
+    const map = leafletMapRef.current;
+    if (!map) return;
+    // Remove existing historical markers
+    if (historicalMarkersRef.current) {
+      historicalMarkersRef.current.remove();
+      historicalMarkersRef.current = null;
+    }
+    if (!historicalEventActive) return;
+    const { year, month } = historicalEventActive;
+    const group = L.layerGroup();
+    HISTORICAL_REGIONS.forEach(region => {
+      const ev = region.events.find(e => e.year === year && e.month === month);
+      if (!ev || ev.level === 'safe') return;
+      const color = LEVEL_COLORS[ev.level];
+      const radius = ev.level === 'extreme' ? 8000 : ev.level === 'severe' ? 6000 : ev.level === 'moderate' ? 4000 : 2500;
+      L.circle([region.lat, region.lng], {
+        radius,
+        color,
+        fillColor: color,
+        fillOpacity: 0.35,
+        weight: 1.5,
+        opacity: 0.8,
+      }).bindPopup(`
+        <div style="font-family:Tajawal,sans-serif;direction:rtl;min-width:220px;background:#0d1117;color:#e2e8f0;border-radius:6px;padding:10px;">
+          <div style="font-size:14px;font-weight:700;color:${color};margin-bottom:4px;">${region.nameAr}</div>
+          <div style="font-size:10px;color:#64748b;margin-bottom:8px;">${region.name} · ${region.region}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <div style="background:rgba(0,80,200,0.15);border:1px solid rgba(0,120,255,0.3);padding:8px;border-radius:6px;text-align:center;">
+              <div style="color:#64748b;font-size:10px;">عمق المياه</div>
+              <div style="color:${color};font-weight:700;font-size:18px;">${ev.waterDepthCm}<span style="font-size:11px;"> cm</span></div>
+            </div>
+            <div style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;text-align:center;">
+              <div style="color:#64748b;font-size:10px;">الهطول</div>
+              <div style="color:#42A5F5;font-weight:700;font-size:18px;">${ev.precipMm}<span style="font-size:11px;"> mm</span></div>
+            </div>
+          </div>
+          <div style="margin-top:6px;font-size:10px;color:#475569;">📅 ${month}/${year} · ${ev.name}</div>
+        </div>
+      `, { className: 'flood-popup', maxWidth: 260 }).addTo(group);
+    });
+    group.addTo(map);
+    historicalMarkersRef.current = group;
+  }, [historicalEventActive]);
+
   // Keep legacy L.circle markers for interactive popups (invisible fill, click-only)
   useEffect(() => {
     const map = leafletMapRef.current;
-    const L = (window as any).L;
-    if (!map || !L) return;
+    if (!map) return;
     const key = 'floodZones';
     if (layerGroupsRef.current[key]) { layerGroupsRef.current[key].remove(); }
     if (!activeLayers.floodZones) return;
@@ -572,7 +620,6 @@ export default function UnifiedMapPage() {
   // When rain = 0: roads show green (safe). When rain > 0: colors reflect flood risk.
   useEffect(() => {
     const map = leafletMapRef.current;
-    const L = (window as any).L;
     if (!map || !L || !data) return;
 
     // Compute average precipitation across all regions
@@ -632,8 +679,7 @@ export default function UnifiedMapPage() {
   // ── Traffic layer ─────────────────────────────────────────────────────────
   useEffect(() => {
     const map = leafletMapRef.current;
-    const L = (window as any).L;
-    if (!map || !L) return;
+    if (!map) return;
     const key = 'traffic';
     if (layerGroupsRef.current[key]) { layerGroupsRef.current[key].remove(); }
     if (!activeLayers.traffic) return;
@@ -667,8 +713,7 @@ export default function UnifiedMapPage() {
   // ── Evacuation layer (dynamic — built from URBAN_ZONES + precipMultiplier) ─
   useEffect(() => {
     const map = leafletMapRef.current;
-    const L = (window as any).L;
-    if (!map || !L) return;
+    if (!map) return;
     const key = 'evacuation';
     if (layerGroupsRef.current[key]) { layerGroupsRef.current[key].remove(); }
     if (!activeLayers.evacuation) return;
@@ -701,8 +746,7 @@ export default function UnifiedMapPage() {
   // ── Heatmap layer ─────────────────────────────────────────────────────────
   useEffect(() => {
     const map = leafletMapRef.current;
-    const L = (window as any).L;
-    if (!map || !L) return;
+    if (!map) return;
     const key = 'heatmap';
     if (layerGroupsRef.current[key]) { layerGroupsRef.current[key].remove(); }
     if (!activeLayers.heatmap) return;
@@ -747,8 +791,7 @@ export default function UnifiedMapPage() {
    // ── Drainage layer ─────────────────────────────────────────────────────
   useEffect(() => {
     const map = leafletMapRef.current;
-    const L = (window as any).L;
-    if (!map || !L) return;
+    if (!map) return;
     const key = 'drainage';
     if (layerGroupsRef.current[key]) { layerGroupsRef.current[key].remove(); }
     if (!activeLayers.drainage) return;
@@ -841,7 +884,6 @@ export default function UnifiedMapPage() {
   // Updates whenever live weather data refreshes (every 2 minutes).
   useEffect(() => {
     const map = leafletMapRef.current;
-    const L = (window as any).L;
     if (!map || !L || !data) return;
     const key = 'liveAccumulation';
     if (layerGroupsRef.current[key]) { layerGroupsRef.current[key].remove(); }
@@ -1394,8 +1436,58 @@ export default function UnifiedMapPage() {
                 <span style={{ fontSize: '8px', opacity: 0.7 }}>{btn.active ? '✓' : '—'}</span>
               </button>
             ))}
+            {/* Historical Archive Button */}
+            <button
+              onClick={() => setShowHistoricalPanel(p => !p)}
+              title={lang === 'ar' ? 'الأرشيف التاريخي 2015-2025' : 'Historical Archive 2015-2025'}
+              style={{
+                background: showHistoricalPanel ? 'rgba(251,191,36,0.2)' : historicalEventActive ? 'rgba(251,191,36,0.12)' : 'rgba(13,17,23,0.85)',
+                border: `1px solid ${showHistoricalPanel ? 'rgba(251,191,36,0.6)' : historicalEventActive ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                borderRadius: '6px', cursor: 'pointer',
+                color: showHistoricalPanel || historicalEventActive ? '#FBBF24' : '#475569',
+                padding: '4px 7px', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '3px',
+                fontFamily: 'Tajawal, sans-serif', whiteSpace: 'nowrap',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span>🗓</span>
+              <span>{lang === 'ar' ? 'تاريخي' : 'History'}</span>
+              {historicalEventActive && (
+                <span style={{ fontSize: '8px', background: 'rgba(251,191,36,0.3)', borderRadius: '3px', padding: '1px 3px' }}>
+                  {historicalEventActive.year}
+                </span>
+              )}
+            </button>
+            {/* Clear historical markers button */}
+            {historicalEventActive && (
+              <button
+                onClick={() => setHistoricalEventActive(null)}
+                style={{
+                  background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+                  borderRadius: '6px', cursor: 'pointer', color: '#EF4444',
+                  padding: '4px 7px', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '3px',
+                  fontFamily: 'Tajawal, sans-serif', whiteSpace: 'nowrap',
+                }}
+              >
+                <span>✕</span>
+                <span>{lang === 'ar' ? 'مسح' : 'Clear'}</span>
+              </button>
+            )}
           </div>
         </div>
+
+        {/* ── Historical Water Panel ── */}
+        {showHistoricalPanel && (
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1500 }}>
+            <HistoricalWaterPanel
+              lang={lang as 'ar' | 'en'}
+              onSelectEvent={(year, month, _regions) => {
+                setHistoricalEventActive({ year, month });
+              }}
+              onClose={() => setShowHistoricalPanel(false)}
+            />
+          </div>
+        )}
 
         {/* Loading overlay */}
         {loadingTier && (
