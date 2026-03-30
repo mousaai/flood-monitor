@@ -234,24 +234,28 @@ function buildTooltipData(
   const [, , , , nameEn, nameAr, , areaKm2] = box;
   const precipMm = multiplierToPrecipMm(precipMultiplier);
 
-  // Get physics-based metrics for this region
+  // Get physics-based metrics for this region (includes catchmentMultiplier & depressionFactor)
   const metrics = computeFloodMetrics(nameEn, precipMm, areaKm2);
 
-  // At high zoom: show point-level data (smaller patch, more precise depth)
+  // At high zoom (≥14): show point-level data for the specific water patch under cursor
   const isPointLevel = zoom >= 14;
   let depthCm = metrics.depthCm;
   let volumeM3 = metrics.volumeM3;
   let pointRadiusM: number | undefined;
+  let displayAreaKm2 = areaKm2;
 
   if (isPointLevel) {
-    // For point-level, show the depth at this specific location
-    // Use the region's physics but scale area to the visible patch
+    // Visible patch radius based on zoom level
     pointRadiusM = estimatePointRadiusM(zoom);
-    const patchAreaM2 = Math.PI * pointRadiusM * pointRadiusM;
-    const patchAreaKm2 = patchAreaM2 / 1_000_000;
-    // Recalculate volume for just this patch
-    volumeM3 = Math.round((depthCm / 100) * patchAreaM2);
-    // Depth stays the same (it's a local property, not area-dependent)
+    const visibleAreaM2 = Math.PI * pointRadiusM * pointRadiusM;
+
+    // The catchmentMultiplier tells us how much larger the contributing
+    // catchment is vs the visible pool. Volume = depth × catchment area.
+    const catchmentAreaM2 = visibleAreaM2 * metrics.catchmentMultiplier;
+    volumeM3 = Math.round((depthCm / 100) * catchmentAreaM2);
+
+    // Display area = visible pool area (what user sees on map)
+    displayAreaKm2 = Math.round(visibleAreaM2 / 1_000_000 * 10000) / 10000;
   }
 
   const risk = depthToRisk(depthCm);
@@ -264,9 +268,7 @@ function buildTooltipData(
     volumeM3,
     riskLevel: risk,
     riskColor: RISK_COLORS[risk] ?? '#F59E0B',
-    areaKm2: isPointLevel
-      ? Math.round(Math.PI * (estimatePointRadiusM(zoom) ** 2) / 1_000_000 * 1000) / 1000
-      : areaKm2,
+    areaKm2: displayAreaKm2,
     runoffMm: metrics.runoffMm,
     infiltratedMm: metrics.infiltratedMm,
     drainedMm: metrics.drainedMm,

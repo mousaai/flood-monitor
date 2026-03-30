@@ -21,6 +21,100 @@
 
 import L from 'leaflet';
 import { isInsideAbuDhabi, getUrbanDensity } from '@/data/abuDhabiBoundary';
+import { REGION_HYDROLOGY } from '@/data/abuDhabiHydrology';
+
+// ── Real terrain lookup from DEM data ─────────────────────────────────────────
+// Each region has a known elevation and slope. We use these to bias the
+// terrain function: low-elevation flat areas get lower terrain values
+// (more flood-prone), high-elevation or steep areas get higher values.
+//
+// Terrain value 0.0 = very flood-prone (low, flat, sealed)
+// Terrain value 1.0 = very dry (high, steep, sandy)
+//
+// Structure: [minLat, maxLat, minLng, maxLng, regionId]
+const TERRAIN_REGIONS: [number, number, number, number, string][] = [
+  // Abu Dhabi Island (2–5m, flat, paved)
+  [24.430, 24.520, 54.300, 54.460, 'Abu Dhabi Island'],
+  [24.455, 24.475, 54.330, 54.360, 'Al Bateen'],
+  [24.455, 24.475, 54.360, 54.390, 'Al Manhal'],
+  [24.460, 24.485, 54.345, 54.375, 'Al Khalidiyah'],
+  [24.460, 24.485, 54.370, 54.400, 'Al Zaab'],
+  [24.460, 24.485, 54.395, 54.425, 'Al Muroor'],
+  [24.470, 24.500, 54.370, 54.405, 'Al Mushrif'],
+  [24.480, 24.505, 54.355, 54.390, 'Tourist Club Area'],
+  [24.440, 24.465, 54.355, 54.395, 'Downtown Abu Dhabi'],
+  // Mussafah (1–3m, flat, industrial — VERY flood-prone)
+  [24.330, 24.420, 54.430, 54.540, 'Mussafah'],
+  [24.340, 24.380, 54.435, 54.480, 'Mussafah Industrial'],
+  [24.380, 24.415, 54.460, 54.520, 'Mussafah Residential'],
+  // KIZAD (1–2m, flat, industrial)
+  [24.265, 24.335, 54.395, 54.470, 'KIZAD'],
+  [24.270, 24.320, 54.400, 54.455, 'KIZAD Industrial'],
+  // MBZ City
+  [24.355, 24.400, 54.490, 54.560, 'Mohammed Bin Zayed City'],
+  // Khalifa City
+  [24.395, 24.445, 54.555, 54.625, 'Khalifa City A'],
+  [24.420, 24.455, 54.595, 54.655, 'Khalifa City B'],
+  // Al Raha / Yas
+  [24.460, 24.510, 54.580, 54.650, 'Yas Island'],
+  [24.440, 24.480, 54.540, 54.590, 'Al Raha Beach'],
+  // Al Maqta (very low, bridge area)
+  [24.475, 24.515, 54.415, 54.475, 'Al Maqta'],
+  // Al Wathba (natural basin, very low)
+  [24.200, 24.280, 54.720, 54.840, 'Al Wathba'],
+  // Al Shamkha (flat, poor drainage)
+  [24.312, 24.415, 54.580, 54.720, 'Al Shamkha'],
+  // Sweihan Road corridor
+  [24.195, 24.310, 54.620, 54.750, 'Sweihan Road'],
+  // Al Falah
+  [24.195, 24.255, 54.540, 54.620, 'Al Falah'],
+  // Baniyas
+  [24.420, 24.480, 54.620, 54.700, 'Baniyas'],
+  // Zayed City
+  [24.310, 24.380, 54.540, 54.620, 'Zayed City'],
+  // Al Rahba / Shahama
+  [24.490, 24.545, 54.600, 54.680, 'Al Rahba'],
+  // ICAD
+  [24.200, 24.280, 54.440, 54.540, 'ICAD'],
+  // Al Ain
+  [24.190, 24.260, 55.720, 55.790, 'Al Ain City'],
+  // Ruwais
+  [24.095, 24.125, 52.710, 52.750, 'Ruwais'],
+  // Al Dhafra / Liwa
+  [23.100, 23.150, 53.600, 53.650, 'Liwa'],
+  // Madinat Zayed
+  [23.680, 23.710, 53.690, 53.720, 'Madinat Zayed'],
+  // Ghayathi (wadi-prone)
+  [23.830, 23.860, 52.790, 52.820, 'Ghayathi'],
+];
+
+// Cache for terrain region lookups
+const _terrainCache = new Map<string, number>();
+
+function getRegionTerrainValue(lat: number, lng: number): number {
+  // Find the most specific region containing this point
+  let best: string | null = null;
+  let bestArea = Infinity;
+  for (const [minLat, maxLat, minLng, maxLng, id] of TERRAIN_REGIONS) {
+    if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+      const area = (maxLat - minLat) * (maxLng - minLng);
+      if (area < bestArea) { bestArea = area; best = id; }
+    }
+  }
+  if (!best) return -1; // not in any known region
+  const h = REGION_HYDROLOGY[best];
+  if (!h) return -1;
+  // Convert elevation + slope to terrain value (0=flood-prone, 1=dry)
+  // Normalize elevation: 0m → 0.0, 300m → 1.0
+  const elevNorm = Math.min(1.0, h.elevationM / 300.0);
+  // Slope contribution: flat (0) → flood-prone, steep (0.15+) → dry
+  const slopeNorm = Math.min(1.0, h.slopeIndex / 0.15);
+  // Runoff coefficient: high runoff → more flood-prone
+  const runoffPenalty = (h.runoffCoeff - 0.5) * 0.4;
+  // Combined terrain value
+  const terrainVal = elevNorm * 0.50 + slopeNorm * 0.30 - runoffPenalty * 0.20;
+  return Math.max(0.0, Math.min(1.0, terrainVal));
+}
 
 export interface FloodHotspot {
   lat: number; lng: number;
@@ -69,13 +163,27 @@ function m2px(meters: number, lat: number, zoom: number): number {
   return meters / mpp;
 }
 
-// ── Pseudo-random terrain (0=low/flood-prone, 1=high/dry) ────────────────────
+// ── Hybrid terrain: real DEM data + micro-variation for natural look ─────────
+// Returns 0.0 (very flood-prone) to 1.0 (very dry)
+// - Known regions: use real elevation, slope, runoff data
+// - Unknown areas: use pseudo-random but biased toward Abu Dhabi's flat terrain
 function terrain(lat: number, lng: number): number {
+  // Try real DEM lookup first
+  const realVal = getRegionTerrainValue(lat, lng);
+  if (realVal >= 0) {
+    // Add small micro-variation (±8%) for natural-looking patches
+    // This prevents perfectly uniform flooding within a region
+    const micro = (Math.sin(lat * 521.1 + lng * 317.7) * 0.5 + 0.5) * 0.08;
+    return Math.max(0.0, Math.min(1.0, realVal + micro - 0.04));
+  }
+  // Fallback for areas outside known regions (desert, sea, etc.)
+  // Abu Dhabi is generally flat (2-10m) so bias toward flood-prone
   const h1 = Math.sin(lat * 317.4 + lng * 211.7) * 0.5 + 0.5;
   const h2 = Math.sin(lat *  89.3 - lng * 143.1) * 0.5 + 0.5;
   const h3 = Math.sin(lat * 521.1 + lng *  67.9) * 0.5 + 0.5;
   const h4 = Math.cos(lat * 173.6 - lng * 389.2) * 0.5 + 0.5;
-  return h1 * 0.35 + h2 * 0.30 + h3 * 0.20 + h4 * 0.15;
+  // Bias toward lower values (more flood-prone) for desert areas
+  return (h1 * 0.35 + h2 * 0.30 + h3 * 0.20 + h4 * 0.15) * 0.75;
 }
 
 // ── Known flood-prone low points ─────────────────────────────────────────────
@@ -537,9 +645,43 @@ export function createFloodWaterLayer(
         if (h >= threshold) { lng += step; continue; }
 
         const frac = (threshold - h) / threshold;
-        // Depth: urban areas get shallower water (faster drainage)
-        const urbanFactor = 1.0 - density * 0.30 * (1.0 - rainFactor * 0.50);
-        const depthCm = baseD * mult * frac * boost * urbanFactor * (zoom < 10 ? 0.60 : 0.90);
+
+        // ── Physics-based depth using real hydrology data ────────────────────────
+        // Get real drainage efficiency and soil infiltration for this location
+        let drainFactor = 1.0; // default: no drainage benefit
+        let infiltFactor = 1.0; // default: no infiltration benefit
+        let catchFactor = 1.0; // default: no catchment amplification
+        const regionVal = getRegionTerrainValue(pLat, pLng);
+        if (regionVal >= 0) {
+          // Find the region hydrology data
+          let bestId: string | null = null;
+          let bestArea = Infinity;
+          for (const [minLat, maxLat, minLng, maxLng, id] of TERRAIN_REGIONS) {
+            if (pLat >= minLat && pLat <= maxLat && pLng >= minLng && pLng <= maxLng) {
+              const area = (maxLat - minLat) * (maxLng - minLng);
+              if (area < bestArea) { bestArea = area; bestId = id; }
+            }
+          }
+          if (bestId) {
+            const hyd = REGION_HYDROLOGY[bestId];
+            if (hyd) {
+              // Drainage efficiency: 0.9 (excellent) → depth reduced by 90%
+              //                      0.1 (poor)      → depth reduced by 10%
+              drainFactor = 1.0 - hyd.drainEfficiency * 0.80;
+              // Soil infiltration: sandy (0.8) → much less water
+              //                    sealed (0.05) → almost no absorption
+              // infiltrationRateMmHr: 50+ (sandy) → much less water; <5 (sealed) → almost no absorption
+              infiltFactor = 1.0 - Math.min(1.0, hyd.infiltrationRateMmHr / 80.0) * 0.60;
+              // Catchment multiplier: depression areas collect more water
+              catchFactor = Math.min(2.5, hyd.catchmentMultiplier * 0.6 + 0.4);
+            }
+          }
+        }
+        // Urban factor: dense urban areas drain faster (sewers)
+        const urbanFactor = 1.0 - density * 0.25 * (1.0 - rainFactor * 0.50);
+        const depthCm = baseD * mult * frac * boost * urbanFactor
+          * drainFactor * infiltFactor * catchFactor
+          * (zoom < 10 ? 0.60 : 0.90);
         if (depthCm < 2) { lng += step; continue; }
 
         const [r, g, b, alpha] = depthToRgba(depthCm);
