@@ -311,19 +311,30 @@ export default function UnifiedMapPage() {
         });
         if (eventsInRange.length > 0) {
           const maxMm = Math.max(...eventsInRange.map(e => e.max_mm));
-          const mult = Math.max(0.3, Math.min(2.5, 0.3 + maxMm * 0.0087));
+          const mult = maxMm === 0
+            ? 0.10
+            : Math.max(0.35, Math.min(2.5, 0.10 + maxMm * 0.0094));
           setPrecipMultiplier(mult);
         } else {
-          setPrecipMultiplier(0.15);
+          setPrecipMultiplier(0.10);
         }
       } else {
         // Month mode: single event
         const ev = FLOOD_EVENTS.find(e => e.year === historicalYear && e.month === historicalMonth);
         if (ev) {
-          const mult = Math.max(0.3, Math.min(2.5, 0.3 + ev.max_mm * 0.0087));
+          // Scale: 0mm→0.10 (dry, barely visible), 10mm→0.39, 36mm→0.61, 78mm→0.98, 254mm→2.50
+          // Formula: 0.10 + mm * 0.0094, capped at 2.5
+          // Dry months (0mm) get 0.10 — no water shown (correct)
+          // Light rain (8-15mm) gets 0.38-0.51 — faint patches
+          // Moderate (30-50mm) gets 0.58-0.77 — clear patches
+          // Extreme (254mm) gets 2.50 — maximum flooding
+          const mult = ev.max_mm === 0
+            ? 0.10   // completely dry — no visible water
+            : Math.max(0.35, Math.min(2.5, 0.10 + ev.max_mm * 0.0094));
           setPrecipMultiplier(mult);
         } else {
-          setPrecipMultiplier(0.15);
+          // No data for this month — show minimal dry state
+          setPrecipMultiplier(0.10);
         }
       }
       return;
