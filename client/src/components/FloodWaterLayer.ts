@@ -340,13 +340,15 @@ export function createFloodWaterLayer(
         if (!isInsideAbuDhabi(pLat, pLng)) { lng += step; continue; }
 
         const density = getUrbanDensity(pLat, pLng);
-        if (density > 0.50) { lng += step; continue; }
-
         const boost = zoneBoost(pLat, pLng);
-        if (density > 0.25 && boost < 1.4) { lng += step; continue; }
 
-        const densityPenalty = density * 0.30;
-        const threshold = Math.min(0.72, Math.max(0.12, 0.52 - densityPenalty + (mult - 1) * 0.07));
+        // Skip only very high density areas UNLESS they are known flood zones
+        if (density > 0.65 && boost < 2.0) { lng += step; continue; }
+        if (density > 0.50 && boost < 1.5) { lng += step; continue; }
+        if (density > 0.30 && boost < 1.3) { lng += step; continue; }
+
+        const densityPenalty = density * 0.20;
+        const threshold = Math.min(0.78, Math.max(0.15, 0.55 - densityPenalty + (mult - 1) * 0.09));
         const h = terrain(pLat, pLng);
         if (h >= threshold) { lng += step; continue; }
 
