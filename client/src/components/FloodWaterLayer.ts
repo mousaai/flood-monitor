@@ -818,19 +818,27 @@ export function createFloodWaterLayer(
             const density = getUrbanDensity(pLat, pLng);
             const boost   = zoneBoost(pLat, pLng);
 
-            // ONLY show in urban areas or known flood hotspots — skip pure desert
-            if (density < 0.05 && boost < 1.3 && !inRegion) { lng += globalStep; continue; }
+            // Desert areas show very light water (runoff still occurs at 254mm)
+            // Urban areas show heavy flooding
+            // inRegion areas are handled by Pass 2 with precise hydrology
+            const isDesert = density < 0.05 && boost < 1.3;
+
+            // Skip desert at low rainfall (mult < 1.5) — only show at heavy rain
+            if (isDesert && mult < 1.5) { lng += globalStep; continue; }
 
             // Urban areas outside TERRAIN_REGIONS get enhanced depth
             const urbanBoost = 1.0 + density * 0.5;
+
+            // Desert runoff factor: sandy soil absorbs more, less accumulation
+            const desertFactor = isDesert ? 0.18 : 1.0;
 
             // Micro-variation
             const micro = (Math.sin(pLat * 521.1 + pLng * 317.7) * 0.5 + 0.5) * 0.15;
             const terrainFinal = Math.max(0.0, terrainBase * (1.0 + micro - 0.075));
 
-            // Depth: reduced for desert, enhanced for urban
+            // Depth: very light for desert, enhanced for urban
             const depthCm = baseD * (netRunoffMm / 10.0) * terrainFinal * 1.5
-              * boost * urbanBoost
+              * boost * urbanBoost * desertFactor
               * (zoom < 10 ? 0.55 : 0.85)
               * (inRegion ? 0.3 : 1.0);  // reduce in regions (Pass 2 handles them)
 
