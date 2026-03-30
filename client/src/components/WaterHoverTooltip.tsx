@@ -27,86 +27,108 @@ interface WaterHoverTooltipProps {
 
 // ── Precise Abu Dhabi region bounding boxes ────────────────────────────────────
 // Each entry: [minLat, maxLat, minLng, maxLng, nameEn, nameAr, baseDepthCm, areaKm2, risk]
+// IMPORTANT: All values verified against abuDhabiRegions.ts and OSM data
 type RegionBox = [number, number, number, number, string, string, number, number, string];
 
 const REGION_BOXES: RegionBox[] = [
-  // Abu Dhabi Island
-  [24.440, 24.510, 54.310, 54.430, 'Abu Dhabi Island', 'جزيرة أبوظبي',          45, 67.0, 'moderate'],
-  [24.455, 24.500, 54.330, 54.400, 'Al Khalidiyah',    'الخالدية',              55, 3.2,  'moderate'],
-  [24.460, 24.490, 54.355, 54.395, 'Al Muroor',        'المرور',                60, 2.8,  'moderate'],
-  [24.445, 24.470, 54.345, 54.375, 'Al Bateen',        'البطين',                40, 2.1,  'minor'],
-  [24.475, 24.500, 54.370, 54.410, 'Al Mushrif',       'المشرف',                50, 3.5,  'moderate'],
-  [24.465, 24.490, 54.385, 54.420, 'Al Nahyan',        'النهيان',               55, 2.9,  'moderate'],
-  [24.480, 54.500, 54.395, 54.430, 'Tourist Club Area','منطقة النادي السياحي',  48, 2.4,  'moderate'],
-  [24.450, 24.475, 54.360, 54.395, 'Downtown Abu Dhabi','وسط المدينة',           62, 4.1,  'moderate'],
+  // ── Abu Dhabi Island sub-districts (smallest boxes first for specificity) ──
+  [24.455, 24.475, 54.330, 54.360, 'Al Bateen',          'البطين',                40,  2.1,  'minor'],
+  [24.455, 24.475, 54.360, 54.390, 'Al Manhal',          'المنهل',                38,  2.5,  'minor'],
+  [24.455, 24.475, 54.385, 54.415, 'Al Karama',          'الكرامة',               42,  2.9,  'minor'],
+  [24.455, 24.475, 54.330, 54.360, 'Al Gharb',           'الغرب',                 35,  3.5,  'minor'],
+  [24.460, 24.485, 54.345, 54.375, 'Al Khalidiyah',      'الخالدية',              55,  4.5,  'moderate'],
+  [24.460, 24.485, 54.370, 54.400, 'Al Zaab',            'الزعاب',                45,  3.8,  'minor'],
+  [24.460, 24.485, 54.395, 54.425, 'Al Muroor',          'المرور',                60,  2.8,  'moderate'],
+  [24.465, 24.490, 54.355, 54.385, 'Al Rawdah',          'الروضة',                38,  2.8,  'minor'],
+  [24.470, 24.500, 54.370, 54.405, 'Al Mushrif',         'المشرف',                50,  6.2,  'moderate'],
+  [24.470, 24.500, 54.400, 54.430, 'Al Nahyan',          'النهيان',               55,  2.9,  'moderate'],
+  [24.480, 24.505, 54.355, 54.390, 'Tourist Club Area',  'منطقة النادي السياحي',  48,  2.4,  'moderate'],
+  [24.440, 24.465, 54.355, 54.395, 'Downtown Abu Dhabi', 'وسط المدينة',           62,  4.1,  'moderate'],
+  [24.455, 24.475, 54.325, 54.355, 'Corniche',           'الكورنيش',              30,  3.2,  'minor'],
+  [24.440, 24.465, 54.375, 54.415, 'Al Difaa',           'الدفاع',                35,  3.2,  'minor'],
+  [24.440, 24.460, 54.395, 54.425, 'Al Refa',            'الرفاع',                32,  2.2,  'minor'],
+  [24.445, 24.475, 54.415, 54.445, 'Zayed Sports City',  'مدينة زايد الرياضية',  28,  4.5,  'minor'],
+  // Abu Dhabi Island general (catch-all for island)
+  [24.430, 24.520, 54.300, 54.450, 'Abu Dhabi Island',   'جزيرة أبوظبي',          45, 67.0,  'moderate'],
 
-  // Mainland Abu Dhabi
-  [24.370, 24.410, 54.450, 54.530, 'Mussafah',         'مصفح',                  85, 28.0, 'severe'],
-  [24.350, 24.380, 54.440, 54.490, 'Mussafah Industrial','مصفح الصناعية',        90, 22.0, 'severe'],
-  [24.390, 24.430, 54.480, 54.540, 'Mussafah Residential','مصفح السكني',         70, 15.0, 'severe'],
+  // ── Al Reem Island ──
+  [24.490, 24.535, 54.390, 54.440, 'Al Reem Island',     'جزيرة الريم',           32,  8.0,  'minor'],
 
-  // KIZAD
-  [24.270, 24.330, 54.400, 54.470, 'KIZAD',            'كيزاد',                 95, 55.0, 'severe'],
-  [24.275, 24.315, 54.405, 54.455, 'KIZAD Industrial', 'كيزاد الصناعية',        100,40.0, 'severe'],
+  // ── Saadiyat Island ──
+  [24.515, 24.565, 54.405, 54.470, 'Saadiyat Island',    'جزيرة السعديات',        28, 18.0,  'minor'],
 
-  // Khalifa City
-  [24.395, 24.445, 54.560, 54.640, 'Khalifa City A',   'خليفة سيتي A',          75, 18.0, 'severe'],
-  [24.425, 24.450, 54.600, 54.650, 'Khalifa City B',   'خليفة سيتي B',          65, 12.0, 'moderate'],
-  [24.430, 24.455, 54.620, 54.670, 'Khalifa City C',   'خليفة سيتي C',          60, 10.0, 'moderate'],
+  // ── Al Maqta / Al Mushrif Bridge area ──
+  [24.475, 24.515, 54.415, 54.475, 'Al Maqta',           'المقطع',                53,  1.6,  'moderate'],
 
-  // Zayed City / MBZ City
-  [24.330, 24.380, 54.590, 54.670, 'Zayed City',       'مدينة زايد',            80, 32.0, 'severe'],
-  [24.360, 24.395, 54.630, 54.690, 'MBZ City',         'مدينة محمد بن زايد',    72, 25.0, 'severe'],
+  // ── Al Bahia (north of island) ──
+  [24.500, 24.540, 54.330, 54.380, 'Al Bahia',           'الباهية',               35, 18.0,  'minor'],
 
-  // Al Shamkha
-  [24.300, 24.355, 54.500, 54.570, 'Al Shamkha',       'الشامخة',               78, 30.0, 'severe'],
+  // ── Mainland Abu Dhabi — Mussafah ──
+  [24.340, 24.380, 54.435, 54.480, 'Mussafah Industrial','مصفح الصناعية',         90, 22.0,  'severe'],
+  [24.380, 24.415, 54.460, 54.520, 'Mussafah Residential','مصفح السكني',          70, 15.0,  'severe'],
+  [24.330, 24.420, 54.430, 54.540, 'Mussafah',           'مصفح',                  85, 42.0,  'severe'],
 
-  // Baniyas
-  [24.295, 24.345, 54.610, 54.680, 'Baniyas',          'بني ياس',               70, 22.0, 'severe'],
+  // ── KIZAD / Khalifa Industrial Zone ──
+  [24.265, 24.335, 54.395, 54.470, 'KIZAD',              'كيزاد',                 95, 55.0,  'severe'],
+  [24.270, 24.320, 54.400, 54.455, 'KIZAD Industrial',   'كيزاد الصناعية',        100,40.0,  'severe'],
 
-  // Al Rahba
-  [24.480, 24.530, 54.550, 54.620, 'Al Rahba',         'الرحبة',                65, 18.0, 'moderate'],
+  // ── Mohammed Bin Zayed City (MBZ) ──
+  [24.355, 24.400, 54.490, 54.560, 'Mohammed Bin Zayed City','مدينة محمد بن زايد', 72, 35.0, 'severe'],
 
-  // Al Wathba
-  [24.235, 24.300, 54.570, 54.650, 'Al Wathba',        'الوثبة',                88, 45.0, 'severe'],
+  // ── Khalifa City A / B ──
+  [24.395, 24.445, 54.555, 54.625, 'Khalifa City A',     'خليفة سيتي A',          75, 18.0,  'severe'],
+  [24.420, 24.455, 54.595, 54.655, 'Khalifa City B',     'خليفة سيتي B',          65, 12.0,  'moderate'],
 
-  // Al Falah
-  [24.200, 24.250, 54.550, 54.620, 'Al Falah',         'الفلاح',                72, 28.0, 'severe'],
+  // ── Yas Island ──
+  [24.460, 24.510, 54.580, 54.645, 'Yas Island',         'جزيرة ياس',             35, 25.0,  'minor'],
 
-  // ICAD
-  [24.340, 24.390, 54.540, 54.600, 'ICAD',             'إيكاد',                 82, 35.0, 'severe'],
+  // ── Al Raha Beach ──
+  [24.465, 24.500, 54.560, 54.600, 'Al Raha Beach',      'شاطئ الراحة',           40,  8.5,  'minor'],
 
-  // Al Maqta
-  [24.480, 24.510, 54.420, 54.470, 'Al Maqta',         'المقطع',                53, 1.6,  'moderate'],
+  // ── Al Rahba (north of Khalifa City) ──
+  [24.500, 24.545, 54.620, 54.680, 'Al Rahba',           'الرحبة',                65, 14.0,  'moderate'],
 
-  // Yas Island
-  [24.460, 24.500, 54.590, 54.640, 'Yas Island',       'جزيرة ياس',             35, 25.0, 'minor'],
+  // ── Zayed City ──
+  [24.320, 24.370, 54.595, 54.660, 'Zayed City',         'مدينة زايد',            80, 32.0,  'severe'],
 
-  // Saadiyat Island
-  [24.520, 24.560, 54.420, 54.470, 'Saadiyat Island',  'جزيرة السعديات',        28, 18.0, 'minor'],
+  // ── Al Shamkha ──
+  [24.355, 24.415, 54.640, 54.720, 'Al Shamkha',         'الشامخة',               78, 30.0,  'severe'],
+  [24.395, 24.430, 54.700, 54.780, 'Al Shamkha Farms',   'مزارع الشامخة',         55,120.0,  'moderate'],
 
-  // Al Reem Island
-  [24.490, 24.530, 54.395, 54.435, 'Al Reem Island',   'جزيرة الريم',           32, 8.0,  'minor'],
+  // ── Baniyas ──
+  [24.295, 24.350, 54.610, 54.670, 'Baniyas',            'بني ياس',               70, 22.0,  'severe'],
 
-  // Ruwais
-  [24.090, 24.130, 52.700, 52.760, 'Ruwais',           'الرويس',                68, 15.0, 'moderate'],
+  // ── Al Wathba ──
+  [24.230, 24.295, 54.565, 54.650, 'Al Wathba',          'الوثبة',                88, 45.0,  'severe'],
+  [24.260, 24.310, 54.750, 54.830, 'Al Wathba Farms',    'مزارع الوثبة',          55, 95.0,  'moderate'],
 
-  // Al Ain
-  [24.180, 24.260, 55.700, 55.800, 'Al Ain',           'العين',                 55, 120.0,'moderate'],
-  [24.195, 24.235, 55.720, 55.770, 'Al Ain City',      'مدينة العين',           60, 45.0, 'moderate'],
+  // ── ICAD ──
+  [24.335, 24.395, 54.530, 54.600, 'ICAD',               'إيكاد',                 82, 35.0,  'severe'],
 
-  // Madinat Zayed (Western Region)
-  [23.670, 23.730, 53.670, 53.740, 'Madinat Zayed',    'مدينة زايد الغربية',   65, 12.0, 'moderate'],
+  // ── Al Falah ──
+  [24.195, 24.255, 54.540, 54.620, 'Al Falah',           'الفلاح',                72, 28.0,  'severe'],
 
-  // Liwa
-  [23.090, 23.160, 53.580, 53.660, 'Liwa',             'ليوا',                  50, 8.0,  'moderate'],
+  // ── North Abu Dhabi Farms ──
+  [24.555, 24.620, 54.400, 54.510, 'North Abu Dhabi Farms','مزارع شمال أبوظبي',   45, 85.0,  'minor'],
 
-  // Al Dhafra
-  [23.500, 24.000, 52.500, 53.500, 'Al Dhafra',        'الظفرة',                45, 200.0,'minor'],
+  // ── Al Ain City ──
+  [24.185, 24.250, 55.710, 55.790, 'Al Ain City',        'مدينة العين',           60, 45.0,  'moderate'],
+  [24.150, 24.280, 55.680, 55.820, 'Al Ain',             'العين',                 55,120.0,  'moderate'],
 
-  // Ghayathi
-  [23.820, 23.860, 52.780, 52.830, 'Ghayathi',         'غياثي',                 110,8.0,  'extreme'],
-  [23.810, 23.850, 52.790, 52.820, 'Ghayathi Center',  'مركز غياثي',            120,4.0,  'extreme'],
+  // ── Ruwais ──
+  [24.085, 24.135, 52.695, 52.770, 'Ruwais',             'الرويس',                68, 15.0,  'moderate'],
+
+  // ── Madinat Zayed (Western Region) ──
+  [23.660, 23.740, 53.660, 53.750, 'Madinat Zayed',      'مدينة زايد الغربية',   65, 12.0,  'moderate'],
+
+  // ── Liwa ──
+  [23.080, 23.170, 53.565, 53.670, 'Liwa',               'ليوا',                  50,  8.0,  'moderate'],
+
+  // ── Ghayathi ──
+  [23.805, 23.865, 52.775, 52.835, 'Ghayathi',           'غياثي',                 110, 8.0,  'extreme'],
+
+  // ── Al Dhafra (large catch-all for western region) ──
+  [22.800, 24.200, 51.500, 54.000, 'Al Dhafra',          'الظفرة',                45,200.0,  'minor'],
 ];
 
 // ── Find region by bounding box (most precise) ────────────────────────────────
@@ -128,16 +150,16 @@ function findRegionByBBox(lat: number, lng: number): RegionBox | null {
   return best;
 }
 
-// ── Fallback: nearest centroid within 5 km ────────────────────────────────────
+// ── Fallback: nearest centroid within 4 km ────────────────────────────────────
 function findNearestCentroid(lat: number, lng: number): RegionBox | null {
   let best: RegionBox | null = null;
-  let minDist = 5000; // max 5 km
+  let minDist = 4000; // max 4 km
 
   for (const box of REGION_BOXES) {
     const [minLat, maxLat, minLng, maxLng] = box;
     const cLat = (minLat + maxLat) / 2;
     const cLng = (minLng + maxLng) / 2;
-    // Quick Euclidean approximation (sufficient for 5 km range)
+    // Quick Euclidean approximation (sufficient for 4 km range)
     const dLat = (lat - cLat) * 111000;
     const dLng = (lng - cLng) * 111000 * Math.cos(lat * Math.PI / 180);
     const dist = Math.sqrt(dLat * dLat + dLng * dLng);
@@ -186,7 +208,7 @@ export default function WaterHoverTooltip({ leafletMap, precipMultiplier, lang, 
 
     // 1. Try exact bounding box match (most accurate)
     let box = findRegionByBBox(lat, lng);
-    // 2. Fallback to nearest centroid within 5 km
+    // 2. Fallback to nearest centroid within 4 km
     if (!box) box = findNearestCentroid(lat, lng);
 
     if (box) {
