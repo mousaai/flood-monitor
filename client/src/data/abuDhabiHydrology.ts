@@ -387,15 +387,28 @@ export const REGION_HYDROLOGY: Record<string, RegionHydrology> = {
   },
 
   // ── Al Shamkha ──────────────────────────────────────────────────────────────
-  // CALIBRATED: South Shamkha and Wathba catchment — drainEff=1.00 (no overflow recorded)
-  // Note: South Shamkha has GOOD drainage infrastructure — all runoff is drained
+  // IMPORTANT: ما يسمى في Masterplan 2022 بـ "South Shamkha" هو نفسه حي الرياض جغرافياً.
+  // الشامخة الشمالية (North Shamkha) لديها شبكة صرف ضعيفة — الشامخة الجنوبية = الرياض بشبكة جيدة.
+  // CALIBRATED: South Shamkha (= Al Riyadh) — drainEff=0.97 (Riyadh North: overflow 11,067m³ / runoff 388,335m³)
   'Al Shamkha': {
     id: 'Al Shamkha', elevationM: 3.5, slopeIndex: 0.02,
     soilType: 'sandy_loam', runoffCoeff: 0.80,
-    drainEfficiency: 0.92, // South Shamkha calibrated: excellent drainage
+    // الشامخة الشمالية: شبكة صرف ضعيفة (drainEff منخفض)
+    drainEfficiency: 0.28,
     infiltrationRateMmHr: 6.0, depressionStorageMm: 5.0,
     catchmentFraction: 0.78, floodDurationHr: 16,
     catchmentMultiplier: 4.0, depressionFactor: 1.8,
+  },
+  // ── Al Shamkha South (= Al Riyadh) ─────────────────────────────────────────────────────────────
+  // جنوب الشامخة في Masterplan 2022 = حي الرياض جغرافياً — شبكة صرف ممتازة
+  // CALIBRATED: drainEff=0.97 (Riyadh North) / drainEff=1.00 (Riyadh South)
+  'Al Shamkha South': {
+    id: 'Al Shamkha South', elevationM: 3.8, slopeIndex: 0.02,
+    soilType: 'sandy_loam', runoffCoeff: 0.75,
+    drainEfficiency: 0.97, // = Al Riyadh calibrated from Masterplan 2022
+    infiltrationRateMmHr: 7.0, depressionStorageMm: 6.0,
+    catchmentFraction: 0.65, floodDurationHr: 4,
+    catchmentMultiplier: 1.5, depressionFactor: 0.8,
   },
   'Al Shamkha Farms': {
     id: 'Al Shamkha Farms', elevationM: 4.0, slopeIndex: 0.02,
@@ -467,13 +480,14 @@ export const REGION_HYDROLOGY: Record<string, RegionHydrology> = {
     catchmentMultiplier: 5.5, depressionFactor: 2.5,
   },
 
-  // ── Al Riyadh (calibrated from Masterplan 2022) ───────────────────────────────────────────────────────
+  // ── Al Riyadh (= South Shamkha in Masterplan 2022) ───────────────────────────────────────────────────────
+  // ملاحظة: ما يسمى في Masterplan 2022 بـ "South Shamkha" هو حي الرياض جغرافياً.
   // Riyadh City North: drainEff=0.97 (overflow 11,067m³ / runoff 388,335m³)
   // Riyadh City South: drainEff=1.00 (overflow 2,129m³ / runoff 574,596m³)
   'Al Riyadh': {
     id: 'Al Riyadh', elevationM: 4.0, slopeIndex: 0.03,
     soilType: 'sandy_loam', runoffCoeff: 0.75,
-    drainEfficiency: 0.97, // Riyadh North calibrated: excellent drainage
+    drainEfficiency: 0.97, // معايَر من Masterplan 2022 (Riyadh North = South Shamkha)
     infiltrationRateMmHr: 8.0, depressionStorageMm: 6.0,
     catchmentFraction: 0.65, floodDurationHr: 4,
     catchmentMultiplier: 1.5, depressionFactor: 0.8,
