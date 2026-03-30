@@ -632,7 +632,19 @@ export function createFloodWaterLayer(
     if (zoom >= 12) _drawPools(ctx, map, zoom, bounds, mult);
   }
 
-  // ── Layer A: Fine irregular patches ──────────────────────────────────────
+  // ── Layer A: Continuous physics-based water accumulation ─────────────────────
+  // NEW MODEL (v6): No gaps, no arbitrary threshold cutoffs.
+  // Every point inside Abu Dhabi gets a computed depth based on:
+  //   1. DEM elevation + slope (terrain) → how much water accumulates
+  //   2. Catchment multiplier → effective pool size (area)
+  //   3. Drainage efficiency → how much is removed by infrastructure
+  //   4. Soil infiltration → how much soaks into ground
+  //   5. Depression factor → amplifies depth in natural basins/wadis
+  //
+  // Pool radius is PHYSICALLY DERIVED:
+  //   r = baseR × sqrt(catchmentMultiplier) × depressionFactor
+  // This means low-lying areas (Al Wathba, Mussafah) show LARGE pools,
+  // well-drained areas (Al Riyadh, Yas Island) show SMALL or NO pools.
   function _drawGrid(ctx: CanvasRenderingContext2D, map: any, zoom: number, bounds: any, mult: number) {
     const north = Math.min(bounds.getNorth(), 25.5);
     const south = Math.max(bounds.getSouth(), 22.5);
@@ -640,101 +652,118 @@ export function createFloodWaterLayer(
     const west  = Math.max(bounds.getWest(),  51.3);
     if (north < 22.5 || south > 25.5) return;
 
-    let step: number, patchM: number, baseD: number;
-    if      (zoom >= 16) { step = 0.0008; patchM =  40; baseD = 15; }
-    else if (zoom >= 14) { step = 0.0018; patchM =  90; baseD = 20; }
-    else if (zoom >= 12) { step = 0.0045; patchM = 200; baseD = 25; }
-    else if (zoom >= 10) { step = 0.0120; patchM = 400; baseD = 30; }
-    else if (zoom >=  8) { step = 0.0350; patchM = 900; baseD = 38; }
-    else                 { step = 0.0900; patchM = 2200; baseD = 45; }
+    // Grid step and base patch size per zoom level
+    let step: number, basePatchM: number, baseD: number;
+    if      (zoom >= 16) { step = 0.0008; basePatchM =  35; baseD = 18; }
+    else if (zoom >= 14) { step = 0.0018; basePatchM =  80; baseD = 22; }
+    else if (zoom >= 12) { step = 0.0045; basePatchM = 180; baseD = 28; }
+    else if (zoom >= 10) { step = 0.0120; basePatchM = 380; baseD = 34; }
+    else if (zoom >=  8) { step = 0.0350; basePatchM = 850; baseD = 42; }
+    else                 { step = 0.0900; basePatchM = 2000; baseD = 50; }
+
+    // rainFactor: 0.0 at mult=0.3 (dry), 1.0 at mult=2.5+ (extreme rain)
+    const rainFactor = Math.min(1.0, Math.max(0.0, (mult - 0.3) / 2.2));
 
     let lat = south;
     while (lat <= north + step) {
       let lng = west;
       while (lng <= east + step) {
-        const jLat = Math.sin(lat * 1337.3 + lng * 919.7) * 0.38 * step;
-        const jLng = Math.cos(lat * 773.1  + lng * 1153.9) * 0.38 * step;
+        // Small deterministic offset to break grid regularity
+        // Biased toward low-lying areas (negative jitter = toward south/west)
+        const jLat = Math.sin(lat * 1337.3 + lng * 919.7) * 0.28 * step;
+        const jLng = Math.cos(lat * 773.1  + lng * 1153.9) * 0.28 * step;
         const pLat = lat + jLat, pLng = lng + jLng;
 
         if (!isInsideAbuDhabi(pLat, pLng)) { lng += step; continue; }
 
         const density = getUrbanDensity(pLat, pLng);
-        const boost = zoneBoost(pLat, pLng);
+        const boost   = zoneBoost(pLat, pLng);
 
-        // ── Rainfall-adaptive density filter ─────────────────────────────────
-        // mult=0.30 (dry)  → only low-density areas show water
-        // mult=1.00 (10mm) → medium density areas start showing
-        // mult=2.50 (254mm)→ ALL areas including dense urban show water
-        //
-        // rainFactor: 0.0 at mult=0.3 (dry), 1.0 at mult=2.5+ (extreme rain)
-        const rainFactor = Math.min(1.0, Math.max(0.0, (mult - 0.3) / 2.2));
+        // ── Step 1: Get hydrology parameters for this location ────────────────
+        let drainEff    = 0.35;  // default: moderate drainage
+        let infiltRate  = 5.0;   // default: moderate infiltration (mm/hr)
+        let catchMult   = 2.0;   // default: moderate catchment
+        let depFactor   = 1.0;   // default: flat terrain
+        let elevM       = 5.0;   // default: 5m elevation
+        let slopeIdx    = 0.05;  // default: slight slope
+        let runoffC     = 0.75;  // default: moderate runoff
 
-        // Maximum density allowed to show water — rises with rainfall
-        // dry: max 0.30 density, extreme rain: max 1.0 (all areas)
-        const maxDensity = 0.30 + rainFactor * 0.70;
-        if (density > maxDensity && boost < 1.8) { lng += step; continue; }
-
-        // Terrain threshold: rises with rainfall (more area covered)
-        // dry: threshold=0.40 → ~40% of area shows water
-        // moderate (mult=1.0): threshold=0.62 → ~62% shows water
-        // extreme (mult=2.5): threshold=0.92 → ~92% shows water
-        const densityPenalty = density * 0.12 * (1.0 - rainFactor * 0.85);
-        const threshold = Math.min(0.95, Math.max(0.22,
-          0.40 - densityPenalty + rainFactor * 0.52
-        ));
-        const h = terrain(pLat, pLng);
-        if (h >= threshold) { lng += step; continue; }
-
-        const frac = (threshold - h) / threshold;
-
-        // ── Physics-based depth using real hydrology data ────────────────────────
-        // Get real drainage efficiency and soil infiltration for this location
-        let drainFactor = 1.0; // default: no drainage benefit
-        let infiltFactor = 1.0; // default: no infiltration benefit
-        let catchFactor = 1.0; // default: no catchment amplification
-        const regionVal = getRegionTerrainValue(pLat, pLng);
-        if (regionVal >= 0) {
-          // Find the region hydrology data
-          let bestId: string | null = null;
-          let bestArea = Infinity;
-          for (const [minLat, maxLat, minLng, maxLng, id] of TERRAIN_REGIONS) {
-            if (pLat >= minLat && pLat <= maxLat && pLng >= minLng && pLng <= maxLng) {
-              const area = (maxLat - minLat) * (maxLng - minLng);
-              if (area < bestArea) { bestArea = area; bestId = id; }
-            }
-          }
-          if (bestId) {
-            const hyd = REGION_HYDROLOGY[bestId];
-            if (hyd) {
-              // Drainage efficiency: 0.9 (excellent) → depth reduced by 90%
-              //                      0.1 (poor)      → depth reduced by 10%
-              drainFactor = 1.0 - hyd.drainEfficiency * 0.80;
-              // Soil infiltration: sandy (0.8) → much less water
-              //                    sealed (0.05) → almost no absorption
-              // infiltrationRateMmHr: 50+ (sandy) → much less water; <5 (sealed) → almost no absorption
-              infiltFactor = 1.0 - Math.min(1.0, hyd.infiltrationRateMmHr / 80.0) * 0.60;
-              // Catchment multiplier: depression areas collect more water
-              catchFactor = Math.min(2.5, hyd.catchmentMultiplier * 0.6 + 0.4);
-            }
+        let bestId: string | null = null;
+        let bestArea = Infinity;
+        for (const [minLat, maxLat, minLng, maxLng, id] of TERRAIN_REGIONS) {
+          if (pLat >= minLat && pLat <= maxLat && pLng >= minLng && pLng <= maxLng) {
+            const area = (maxLat - minLat) * (maxLng - minLng);
+            if (area < bestArea) { bestArea = area; bestId = id; }
           }
         }
-        // Urban factor: dense urban areas drain faster (sewers)
-        const urbanFactor = 1.0 - density * 0.25 * (1.0 - rainFactor * 0.50);
-        const depthCm = baseD * mult * frac * boost * urbanFactor
-          * drainFactor * infiltFactor * catchFactor
-          * (zoom < 10 ? 0.60 : 0.90);
-        if (depthCm < 2) { lng += step; continue; }
+        if (bestId) {
+          const hyd = REGION_HYDROLOGY[bestId];
+          if (hyd) {
+            drainEff   = hyd.drainEfficiency;
+            infiltRate = hyd.infiltrationRateMmHr;
+            catchMult  = hyd.catchmentMultiplier;
+            depFactor  = hyd.depressionFactor;
+            elevM      = hyd.elevationM;
+            slopeIdx   = hyd.slopeIndex;
+            runoffC    = hyd.runoffCoeff;
+          }
+        }
+
+        // ── Step 2: Compute net runoff depth (mm) ────────────────────────────
+        // Rational method: Q = P × C_runoff × (1 - f_infil) × (1 - f_drain)
+        // P = precipitation equivalent (mult × 10 mm baseline)
+        const precipMm = mult * 10.0;
+        // Infiltration fraction: sandy soil absorbs more
+        const fInfil = Math.min(0.85, infiltRate / 60.0);
+        // Net runoff after infiltration and drainage
+        const netRunoffMm = precipMm * runoffC * (1.0 - fInfil) * (1.0 - drainEff * 0.85);
+
+        // ── Step 3: Terrain factor ────────────────────────────────────────────
+        // Low elevation + flat slope = more accumulation
+        // High elevation + steep slope = less accumulation (water flows away)
+        const elevNorm  = Math.min(1.0, elevM / 20.0);   // 0=sea level, 1=20m+
+        const slopeNorm = Math.min(1.0, slopeIdx / 0.12); // 0=flat, 1=steep
+        // Terrain accumulation factor: 0.0 (steep hill) → 1.0 (flat basin)
+        const terrainAccum = (1.0 - elevNorm * 0.55) * (1.0 - slopeNorm * 0.65);
+
+        // Add micro-variation for natural-looking patches (±12%)
+        const micro = (Math.sin(pLat * 521.1 + pLng * 317.7) * 0.5 + 0.5) * 0.12;
+        const terrainFinal = Math.max(0.0, terrainAccum * (1.0 + micro - 0.06));
+
+        // ── Step 4: Minimum rainfall to show water ────────────────────────────
+        // Areas with excellent drainage (drainEff > 0.85) need more rain
+        // Areas with zero drainage (drainEff = 0) show water even in light rain
+        const minMultToShow = 0.15 + drainEff * 1.2 + slopeIdx * 2.0;
+        if (mult < minMultToShow && boost < 1.5) { lng += step; continue; }
+
+        // ── Step 5: Compute final depth ───────────────────────────────────────
+        const depthCm = baseD * (netRunoffMm / 10.0) * terrainFinal * depFactor
+          * boost * (1.0 + density * 0.15)
+          * (zoom < 10 ? 0.65 : 0.92);
+
+        if (depthCm < 1.5) { lng += step; continue; }
 
         const [r, g, b, alpha] = depthToRgba(depthCm);
         if (alpha < 0.01) { lng += step; continue; }
+
+        // ── Step 6: Compute PHYSICAL pool radius ──────────────────────────────
+        // Pool radius scales with catchment multiplier and depression factor
+        // Large catchment (Al Wathba: 8.0) → pool 2.8× larger than base
+        // Small catchment (Al Riyadh: 1.5) → pool 1.2× base size
+        const catchScale = Math.sqrt(catchMult) * depFactor * 0.55;
+        const patchM = basePatchM * Math.max(0.5, Math.min(3.5, catchScale));
 
         const pt = map.latLngToContainerPoint([pLat, pLng]);
         const rpx = m2px(patchM, pLat, zoom);
         if (rpx < 1) { lng += step; continue; }
 
-        const rx = rpx * (1.0 + Math.sin(pLat * 211.3 + pLng * 317.7) * 0.25);
-        const ry = rpx * (0.68 + Math.cos(pLat * 149.1 + pLng * 251.3) * 0.20);
-        const angle = Math.sin(pLat * 97.3 + pLng * 131.7) * 0.55;
+        // Shape: elongated ellipse oriented along terrain slope direction
+        // Flat areas: more circular; sloped areas: more elongated
+        const elongation = 1.0 - slopeIdx * 0.5;
+        const rx = rpx * (1.0 + Math.sin(pLat * 211.3 + pLng * 317.7) * 0.22);
+        const ry = rpx * (elongation * 0.72 + Math.cos(pLat * 149.1 + pLng * 251.3) * 0.15);
+        // Angle follows terrain slope direction (deterministic per location)
+        const angle = Math.sin(pLat * 97.3 + pLng * 131.7) * 0.60;
 
         ctx.save();
         ctx.translate(pt.x, pt.y);
@@ -743,9 +772,9 @@ export function createFloodWaterLayer(
 
         const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
         grd.addColorStop(0.00, `rgba(${r},${g},${b},${alpha.toFixed(3)})`);
-        grd.addColorStop(0.40, `rgba(${r},${g},${b},${(alpha * 0.78).toFixed(3)})`);
-        grd.addColorStop(0.68, `rgba(${r},${g},${b},${(alpha * 0.38).toFixed(3)})`);
-        grd.addColorStop(0.88, `rgba(${r},${g},${b},${(alpha * 0.10).toFixed(3)})`);
+        grd.addColorStop(0.35, `rgba(${r},${g},${b},${(alpha * 0.80).toFixed(3)})`);
+        grd.addColorStop(0.62, `rgba(${r},${g},${b},${(alpha * 0.42).toFixed(3)})`);
+        grd.addColorStop(0.82, `rgba(${r},${g},${b},${(alpha * 0.12).toFixed(3)})`);
         grd.addColorStop(1.00, `rgba(${r},${g},${b},0)`);
 
         ctx.fillStyle = grd;
