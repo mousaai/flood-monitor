@@ -106,6 +106,20 @@ const FLOOD_ZONES: FZ[] = [
   { lat: 23.828, lng: 52.798, r: 0.020, boost: 4.5 },
   { lat: 24.215, lng: 55.750, r: 0.022, boost: 2.8 },
   { lat: 24.205, lng: 55.760, r: 0.018, boost: 2.6 },
+  // Abu Dhabi Island — documented flood zones April 2024
+  { lat: 24.4650, lng: 54.3600, r: 0.018, boost: 3.5 }, // Al Khalidiyah underpass
+  { lat: 24.4520, lng: 54.3680, r: 0.015, boost: 3.2 }, // Al Manhal low point
+  { lat: 24.4720, lng: 54.3850, r: 0.020, boost: 3.0 }, // Al Mushrif depression
+  { lat: 24.4580, lng: 54.3420, r: 0.016, boost: 2.8 }, // Al Bateen coastal
+  { lat: 24.4680, lng: 54.3780, r: 0.022, boost: 3.4 }, // Al Muroor road basin
+  { lat: 24.4600, lng: 54.3720, r: 0.012, boost: 3.2 }, // Al Zaab intersection
+  { lat: 24.4900, lng: 54.3700, r: 0.016, boost: 2.8 }, // Tourist Club area
+  { lat: 24.4750, lng: 54.3950, r: 0.020, boost: 3.0 }, // Al Nahyan camp drain
+  { lat: 24.4700, lng: 54.3650, r: 0.018, boost: 3.2 }, // Central Abu Dhabi low
+  { lat: 24.4630, lng: 54.3550, r: 0.014, boost: 2.9 }, // Al Khalidiyah west
+  { lat: 24.4800, lng: 54.3800, r: 0.020, boost: 2.8 }, // Al Karamah area
+  { lat: 24.4550, lng: 54.3750, r: 0.016, boost: 3.0 }, // Downtown low
+  { lat: 24.4850, lng: 54.3650, r: 0.018, boost: 2.7 }, // Al Corniche low
   { lat: 24.455, lng: 54.380, r: 0.010, boost: 2.2 },
   { lat: 24.450, lng: 54.390, r: 0.008, boost: 2.4 },
   { lat: 24.500, lng: 54.560, r: 0.022, boost: 2.8 },
