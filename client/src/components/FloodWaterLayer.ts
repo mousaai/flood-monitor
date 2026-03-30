@@ -319,6 +319,47 @@ const FLOOD_ZONES: FZ[] = [
   { lat: 24.195, lng: 55.728, r: 0.018, boost: 3.0 }, // Al Ain south wadi
   { lat: 24.238, lng: 55.768, r: 0.016, boost: 2.8 }, // Al Ain north
 
+  // ── Al Bateen / Al Muntazah (4 Critical Hotspots — Municipality Register) ────
+  { lat: 24.427, lng: 54.471, r: 0.030, boost: 4.5 }, // Khalifa Park Area — Critical
+  { lat: 24.427, lng: 54.445, r: 0.028, boost: 4.5 }, // Air Force Roundabout / Al Muntazah — Critical
+  { lat: 24.428, lng: 54.450, r: 0.025, boost: 4.3 }, // Al Bateen low point — Critical
+  { lat: 24.438, lng: 54.464, r: 0.022, boost: 4.0 }, // Qasr Al Mina / Al Jamayel — Critical
+  { lat: 24.404, lng: 54.477, r: 0.020, boost: 3.8 }, // Officers Club Park — no network
+
+  // ── Al Shahama East / Al Falah outer (9 hotspots — no drainage network) ────
+  { lat: 24.428, lng: 54.742, r: 0.030, boost: 3.5 }, // Al Falah outer east
+  { lat: 24.419, lng: 54.753, r: 0.025, boost: 3.2 }, // Opposite Al Falah
+  { lat: 24.427, lng: 54.756, r: 0.022, boost: 3.0 }, // Al Thawb Street
+  { lat: 24.461, lng: 54.716, r: 0.022, boost: 3.0 }, // Al Kawthar Street
+  { lat: 24.387, lng: 54.724, r: 0.020, boost: 2.8 }, // Al Shamekha Makani Mall
+  { lat: 24.400, lng: 54.734, r: 0.020, boost: 2.8 }, // Al Shamekha Mall parking
+  { lat: 24.378, lng: 54.770, r: 0.025, boost: 3.5 }, // Al Riyadh Al Metlaa — Critical
+
+  // ── Al Shahama Tunnel / Al Reef area ─────────────────────────────────────
+  { lat: 24.538, lng: 54.685, r: 0.030, boost: 3.8 }, // Shahama Tunnel — Critical
+  { lat: 24.483, lng: 54.648, r: 0.022, boost: 3.0 }, // Yas Bridges Complex
+  { lat: 24.555, lng: 54.694, r: 0.020, boost: 2.8 }, // Bani Yas Cooperative
+
+  // ── Al Adla / Wathba East (no drainage) ──────────────────────────────────
+  { lat: 24.411, lng: 54.870, r: 0.028, boost: 3.0 }, // Al Adla area
+  { lat: 24.419, lng: 54.866, r: 0.022, boost: 2.8 }, // Armed Forces Cooperative
+
+  // ── Khalifa Industrial City / Al Samha (no drainage) ─────────────────────
+  { lat: 24.672, lng: 54.761, r: 0.030, boost: 3.0 }, // Al Samha
+  { lat: 24.683, lng: 54.767, r: 0.025, boost: 2.8 }, // Khalifa Industrial City 1
+  { lat: 24.690, lng: 54.777, r: 0.025, boost: 2.8 }, // Khalifa Industrial City 2
+  { lat: 24.695, lng: 54.781, r: 0.022, boost: 2.8 }, // Khalifa Industrial City 3
+
+  // ── Ghantoot (far north — no drainage) ───────────────────────────────────
+  { lat: 24.854, lng: 54.900, r: 0.035, boost: 3.2 }, // Ghantoot inbound
+  { lat: 24.854, lng: 54.900, r: 0.030, boost: 3.0 }, // Ghantoot outbound
+
+  // ── Al Khatim / Al Khatem (far east — no drainage) ───────────────────────
+  { lat: 24.183, lng: 54.993, r: 0.030, boost: 3.0 }, // Al Khatim school area
+
+  // ── Khalifa City Al Murayf (Critical) ─────────────────────────────────────
+  { lat: 24.425, lng: 54.546, r: 0.028, boost: 4.0 }, // Al Murayf / Al Maqasid — Critical
+
   // ── Al Dhafra / Liwa area (الظفرة / ليوا) ───────────────────────────────
   { lat: 23.120, lng: 53.620, r: 0.040, boost: 3.5 }, // Liwa oasis basin
   { lat: 23.110, lng: 53.610, r: 0.030, boost: 3.2 }, // Liwa west
