@@ -29,6 +29,8 @@ import { useIsMobile } from '@/hooks/useMobile';
 import MobileBottomSheet from '@/components/MobileBottomSheet';
 import { trpc } from '@/lib/trpc';
 import KPIDrillDown, { type DrillDownType } from '@/components/KPIDrillDown';
+import WaterHoverTooltip from '@/components/WaterHoverTooltip';
+import WaterVolumeSummary from '@/components/WaterVolumeSummary';
 
 // ── Tooltip definitions ─────────────────────────────────────────────────────────────
 const MAP_TOOLTIPS = {
@@ -251,6 +253,7 @@ export default function UnifiedMapPage() {
   const [showLegend, setShowLegend] = useState(true);
   const [showBadge, setShowBadge] = useState(true);
   const [kpiModal, setKpiModal] = useState<DrillDownType | null>(null);
+  const [showWaterSummary, setShowWaterSummary] = useState(false);
   const [showHistoricalPanel, setShowHistoricalPanel] = useState(false);
   const [historicalMode, setHistoricalMode] = useState(false);           // true = showing historical timeline
   const [historicalYear, setHistoricalYear] = useState(2024);            // selected year
@@ -1349,6 +1352,30 @@ export default function UnifiedMapPage() {
                   </button>
                 ))}
 
+                {/* Water Volume Summary button — shown when water layer is active */}
+                {activeLayers.floodZones && (
+                  <button
+                    onClick={() => setShowWaterSummary(v => !v)}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '7px 10px', borderRadius: '8px', cursor: 'pointer',
+                      background: showWaterSummary ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.05)',
+                      border: `1px solid ${showWaterSummary ? 'rgba(59,130,246,0.4)' : 'rgba(59,130,246,0.15)'}`,
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <div style={{ width: '22px', height: '22px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(59,130,246,0.2)', color: '#60A5FA', flexShrink: 0 }}>
+                      <BarChart2 size={12} />
+                    </div>
+                    <span style={{ fontSize: '11px', color: showWaterSummary ? '#93C5FD' : '#60A5FA', flex: 1, fontWeight: 600 }}>
+                      {lang === 'ar' ? 'حصر كميات المياه' : 'Water Volume Summary'}
+                    </span>
+                    <span style={{ fontSize: '9px', color: '#475569' }}>
+                      {lang === 'ar' ? 'سنة / شهر / أسبوع' : 'Year / Month / Week'}
+                    </span>
+                  </button>
+                )}
+
                 {/* Traffic phase sub-control */}
                 {activeLayers.traffic && (
                   <div style={{ padding: '8px', background: 'rgba(249,115,22,0.06)', borderRadius: '8px', border: '1px solid rgba(249,115,22,0.15)' }}>
@@ -1915,6 +1942,24 @@ export default function UnifiedMapPage() {
             )}
           </div>
         </MobileBottomSheet>
+      )}
+
+      {/* Water Hover Tooltip — shows on map hover */}
+      <WaterHoverTooltip
+        leafletMap={leafletMapRef.current}
+        precipMultiplier={precipMultiplier}
+        lang={lang as 'ar' | 'en'}
+        enabled={activeLayers.floodZones}
+      />
+
+      {/* Water Volume Summary Panel */}
+      {showWaterSummary && (
+        <WaterVolumeSummary
+          onClose={() => setShowWaterSummary(false)}
+          lang={lang as 'ar' | 'en'}
+          currentYear={historicalMode ? historicalYear : new Date().getFullYear()}
+          currentMonth={historicalMode ? historicalMonth : new Date().getMonth() + 1}
+        />
       )}
 
       {/* KPI Drill-Down Modal */}
