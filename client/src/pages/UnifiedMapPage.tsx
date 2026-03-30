@@ -1944,13 +1944,15 @@ export default function UnifiedMapPage() {
         </MobileBottomSheet>
       )}
 
-      {/* Water Hover Tooltip — shows on map hover */}
-      <WaterHoverTooltip
-        leafletMap={leafletMapRef.current}
-        precipMultiplier={precipMultiplier}
-        lang={lang as 'ar' | 'en'}
-        enabled={activeLayers.floodZones}
-      />
+      {/* Water Hover Tooltip — shows on map hover (mapReady ensures leafletMapRef.current is non-null) */}
+      {mapReady && (
+        <WaterHoverTooltip
+          leafletMap={leafletMapRef.current}
+          precipMultiplier={precipMultiplier}
+          lang={lang as 'ar' | 'en'}
+          enabled={activeLayers.floodZones}
+        />
+      )}
 
       {/* Water Volume Summary Panel */}
       {showWaterSummary && (
