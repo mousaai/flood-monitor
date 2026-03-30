@@ -228,7 +228,7 @@ export default function UnifiedMapPage() {
   const floodWaterLayerRef = useRef<FloodWaterLayerInstance | null>(null);
 
   const [activeLayers, setActiveLayers] = useState<Record<LayerKey, boolean>>({
-    floodZones: true, roads: true, traffic: false, contour: false, evacuation: false, heatmap: false, drainage: true,
+    floodZones: true, roads: false, traffic: false, contour: false, evacuation: false, heatmap: false, drainage: false,
   });
   const [trafficPhase, setTrafficPhase] = useState<TrafficPhase>('during');
   const [currentZoom, setCurrentZoom] = useState(10);
