@@ -403,6 +403,69 @@ const FLOOD_ZONES: FZ[] = [
   { lat: 24.225, lng: 54.580, r: 0.020, boost: 3.4 }, // Al Falah east
   { lat: 24.195, lng: 54.550, r: 0.018, boost: 3.2 }, // Al Falah SW
   { lat: 24.235, lng: 54.590, r: 0.016, boost: 3.0 }, // Al Falah NE
+
+  // ── Mussafah Industrial & Residential ────────────────────────────────────
+  { lat: 24.360, lng: 54.470, r: 0.045, boost: 3.8 }, // Mussafah central
+  { lat: 24.375, lng: 54.460, r: 0.035, boost: 3.5 }, // Mussafah north
+  { lat: 24.345, lng: 54.480, r: 0.030, boost: 3.6 }, // Mussafah south
+  { lat: 24.355, lng: 54.490, r: 0.028, boost: 3.4 }, // Mussafah east
+  { lat: 24.370, lng: 54.450, r: 0.025, boost: 3.2 }, // Mussafah west
+  { lat: 24.385, lng: 54.465, r: 0.022, boost: 3.0 }, // Mussafah NW
+
+  // ── MBZ City / Mohamed Bin Zayed ─────────────────────────────────────────
+  { lat: 24.395, lng: 54.505, r: 0.040, boost: 3.6 }, // MBZ central
+  { lat: 24.410, lng: 54.515, r: 0.032, boost: 3.4 }, // MBZ north
+  { lat: 24.380, lng: 54.495, r: 0.028, boost: 3.2 }, // MBZ south
+  { lat: 24.400, lng: 54.530, r: 0.025, boost: 3.0 }, // MBZ east
+
+  // ── Al Wathba ─────────────────────────────────────────────────────────────
+  { lat: 24.265, lng: 54.770, r: 0.055, boost: 4.5 }, // Al Wathba main
+  { lat: 24.280, lng: 54.755, r: 0.040, boost: 4.2 }, // Al Wathba NW
+  { lat: 24.250, lng: 54.785, r: 0.035, boost: 4.0 }, // Al Wathba SE
+  { lat: 24.295, lng: 54.740, r: 0.030, boost: 3.8 }, // Al Wathba north
+  { lat: 24.235, lng: 54.800, r: 0.028, boost: 3.6 }, // Al Wathba south
+  { lat: 24.270, lng: 54.810, r: 0.025, boost: 3.4 }, // Al Wathba east
+
+  // ── Baniyas ───────────────────────────────────────────────────────────────
+  { lat: 24.430, lng: 54.640, r: 0.040, boost: 3.5 }, // Baniyas central
+  { lat: 24.445, lng: 54.655, r: 0.032, boost: 3.3 }, // Baniyas north
+  { lat: 24.415, lng: 54.625, r: 0.028, boost: 3.1 }, // Baniyas south
+  { lat: 24.435, lng: 54.670, r: 0.025, boost: 3.0 }, // Baniyas east
+  { lat: 24.420, lng: 54.610, r: 0.022, boost: 2.8 }, // Baniyas west
+
+  // ── Shahama / Al Samha ────────────────────────────────────────────────────
+  { lat: 24.535, lng: 54.440, r: 0.045, boost: 3.4 }, // Shahama central
+  { lat: 24.550, lng: 54.455, r: 0.035, boost: 3.2 }, // Shahama north
+  { lat: 24.520, lng: 54.425, r: 0.030, boost: 3.0 }, // Shahama south
+  { lat: 24.540, lng: 54.470, r: 0.025, boost: 2.8 }, // Shahama east
+
+  // ── Al Ain City ───────────────────────────────────────────────────────────
+  { lat: 24.215, lng: 55.760, r: 0.050, boost: 3.8 }, // Al Ain center
+  { lat: 24.230, lng: 55.775, r: 0.040, boost: 3.6 }, // Al Ain north
+  { lat: 24.200, lng: 55.745, r: 0.035, boost: 3.4 }, // Al Ain south
+  { lat: 24.220, lng: 55.790, r: 0.030, boost: 3.2 }, // Al Ain east
+  { lat: 24.210, lng: 55.730, r: 0.028, boost: 3.0 }, // Al Ain west
+  { lat: 24.245, lng: 55.760, r: 0.025, boost: 2.8 }, // Al Ain Hili
+  { lat: 24.165, lng: 55.710, r: 0.030, boost: 3.0 }, // Al Ain Zakher
+
+  // ── Zayed City / Al Shamkha North ────────────────────────────────────────
+  { lat: 24.300, lng: 54.640, r: 0.040, boost: 3.6 }, // Zayed City central
+  { lat: 24.315, lng: 54.655, r: 0.032, boost: 3.4 }, // Zayed City north
+  { lat: 24.285, lng: 54.625, r: 0.028, boost: 3.2 }, // Zayed City south
+
+  // ── Madinat Zayed ─────────────────────────────────────────────────────────
+  { lat: 23.705, lng: 53.730, r: 0.045, boost: 3.2 }, // Madinat Zayed central
+  { lat: 23.720, lng: 53.745, r: 0.035, boost: 3.0 }, // Madinat Zayed north
+  { lat: 23.690, lng: 53.715, r: 0.030, boost: 2.8 }, // Madinat Zayed south
+
+  // ── Liwa Oasis ────────────────────────────────────────────────────────────
+  { lat: 23.115, lng: 53.790, r: 0.040, boost: 3.0 }, // Liwa central
+  { lat: 23.130, lng: 53.805, r: 0.030, boost: 2.8 }, // Liwa north
+  { lat: 23.100, lng: 53.775, r: 0.025, boost: 2.6 }, // Liwa south
+
+  // ── Al Ain East / Sweihan ─────────────────────────────────────────────────
+  { lat: 24.250, lng: 55.680, r: 0.035, boost: 3.0 }, // Al Ain east
+  { lat: 24.195, lng: 55.650, r: 0.030, boost: 2.8 }, // Al Ain SE
 ];
 
 function zoneBoost(lat: number, lng: number): number {
