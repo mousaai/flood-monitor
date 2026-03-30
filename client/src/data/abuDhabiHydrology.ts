@@ -95,10 +95,15 @@ export const REGION_HYDROLOGY: Record<string, RegionHydrology> = {
 
   // ── Abu Dhabi Island sub-districts ──────────────────────────────────────────
   // Island: 2–5m above MSL, heavily paved, poor drainage in 2024
+  // CALIBRATED from Masterplan 2022:
+  //   OLD catchment: drainEff=0.91 (overflow 28,526m³ / runoff 334,394m³)
+  //   CJNOQR catchment: drainEff=0.83 (overflow 48,654m³ / runoff 289,114m³)
+  //   RD M catchment: drainEff=0.00 (overflow 80,948m³ — no drain infrastructure)
+  //   A_A1_A2: drainEff=1.00 (zero overflow)
   // Flat terrain → large catchment multiplier
   'Al Bateen': {
     id: 'Al Bateen', elevationM: 4.5, slopeIndex: 0.05,
-    soilType: 'urban_paved', runoffCoeff: 0.88, drainEfficiency: 0.45,
+    soilType: 'urban_paved', runoffCoeff: 0.88, drainEfficiency: 0.83, // CJNOQR calibrated
     infiltrationRateMmHr: 2.0, depressionStorageMm: 3.0,
     catchmentFraction: 0.75, floodDurationHr: 6,
     catchmentMultiplier: 2.2, depressionFactor: 1.1,
@@ -208,9 +213,11 @@ export const REGION_HYDROLOGY: Record<string, RegionHydrology> = {
     catchmentFraction: 0.65, floodDurationHr: 5,
     catchmentMultiplier: 1.8, depressionFactor: 0.9,
   },
+  // CALIBRATED: OLD catchment (main island) — drainEff=0.91
   'Abu Dhabi Island': {
     id: 'Abu Dhabi Island', elevationM: 3.5, slopeIndex: 0.04,
-    soilType: 'urban_paved', runoffCoeff: 0.88, drainEfficiency: 0.42,
+    soilType: 'urban_paved', runoffCoeff: 0.88,
+    drainEfficiency: 0.91, // OLD catchment calibrated from Masterplan 2022
     infiltrationRateMmHr: 1.8, depressionStorageMm: 2.5,
     catchmentFraction: 0.80, floodDurationHr: 8,
     catchmentMultiplier: 2.8, depressionFactor: 1.3,
@@ -256,23 +263,33 @@ export const REGION_HYDROLOGY: Record<string, RegionHydrology> = {
   // ── Mussafah ────────────────────────────────────────────────────────────────
   // CRITICAL: Very low elevation (1–3m), industrial/paved, poor drainage
   // Largest flood accumulation in April 2024
+  // CALIBRATED from Stormwater Masterplan 2022 (Table 13.2):
+  //   Musaffah_01: drainEff=0.44 (overflow 64,195m³ / runoff 113,733m³)
+  //   Musaffah_02: drainEff=0.20 (overflow 85,234m³ / runoff 105,936m³)
+  //   Musaffah_03: drainEff=0.27 (overflow 49,232m³ / runoff 67,241m³)
+  //   Musaffah_06: drainEff=0.48 (overflow 49,778m³ / runoff 95,868m³)
+  //   Musaffah_08: drainEff=0.67 (overflow 50,832m³ / runoff 152,426m³)
+  //   Musaffah_09: drainEff=0.00 (overflow 219,631m³ > runoff — network overwhelmed)
   'Mussafah Industrial': {
     id: 'Mussafah Industrial', elevationM: 1.8, slopeIndex: 0.01,
-    soilType: 'industrial', runoffCoeff: 0.95, drainEfficiency: 0.15,
+    soilType: 'industrial', runoffCoeff: 0.95,
+    drainEfficiency: 0.20, // Musaffah_02 calibrated: 20% drain efficiency
     infiltrationRateMmHr: 0.5, depressionStorageMm: 1.5,
     catchmentFraction: 0.92, floodDurationHr: 36,
     catchmentMultiplier: 5.5, depressionFactor: 2.5, // very flat, very low
   },
   'Mussafah Residential': {
     id: 'Mussafah Residential', elevationM: 2.5, slopeIndex: 0.02,
-    soilType: 'urban_paved', runoffCoeff: 0.88, drainEfficiency: 0.22,
+    soilType: 'urban_paved', runoffCoeff: 0.88,
+    drainEfficiency: 0.44, // Musaffah_01 calibrated: 44% drain efficiency
     infiltrationRateMmHr: 1.5, depressionStorageMm: 2.0,
     catchmentFraction: 0.88, floodDurationHr: 24,
     catchmentMultiplier: 4.5, depressionFactor: 2.0,
   },
   'Mussafah': {
     id: 'Mussafah', elevationM: 2.0, slopeIndex: 0.01,
-    soilType: 'industrial', runoffCoeff: 0.93, drainEfficiency: 0.18,
+    soilType: 'industrial', runoffCoeff: 0.93,
+    drainEfficiency: 0.27, // Musaffah_03 calibrated: 27% drain efficiency
     infiltrationRateMmHr: 0.8, depressionStorageMm: 1.5,
     catchmentFraction: 0.90, floodDurationHr: 30,
     catchmentMultiplier: 5.0, depressionFactor: 2.3,
@@ -321,9 +338,11 @@ export const REGION_HYDROLOGY: Record<string, RegionHydrology> = {
   },
 
   // ── Yas Island ──────────────────────────────────────────────────────────────
+  // CALIBRATED: YAS 1 catchment — drainEff=0.84 (overflow 25,409m³ / runoff 157,014m³)
   'Yas Island': {
     id: 'Yas Island', elevationM: 2.5, slopeIndex: 0.05,
-    soilType: 'urban_paved', runoffCoeff: 0.82, drainEfficiency: 0.58,
+    soilType: 'urban_paved', runoffCoeff: 0.82,
+    drainEfficiency: 0.84, // YAS 1 calibrated from Masterplan 2022
     infiltrationRateMmHr: 3.0, depressionStorageMm: 4.0,
     catchmentFraction: 0.68, floodDurationHr: 5,
     catchmentMultiplier: 2.0, depressionFactor: 1.0,
@@ -357,19 +376,23 @@ export const REGION_HYDROLOGY: Record<string, RegionHydrology> = {
   },
 
   // ── Zayed City ──────────────────────────────────────────────────────────────
+  // CALIBRATED: ADM LINE catchment — drainEff=0.82 (overflow 102,623m³ / runoff 573,850m³)
   'Zayed City': {
     id: 'Zayed City', elevationM: 3.0, slopeIndex: 0.02,
-    soilType: 'sandy_loam', runoffCoeff: 0.83, drainEfficiency: 0.30,
+    soilType: 'sandy_loam', runoffCoeff: 0.83,
+    drainEfficiency: 0.82, // ADM LINE calibrated from Masterplan 2022
     infiltrationRateMmHr: 5.5, depressionStorageMm: 4.5,
     catchmentFraction: 0.80, floodDurationHr: 14,
     catchmentMultiplier: 3.8, depressionFactor: 1.7,
   },
 
   // ── Al Shamkha ──────────────────────────────────────────────────────────────
-  // Flat, low-lying, poor drainage — major flood area April 2024
+  // CALIBRATED: South Shamkha and Wathba catchment — drainEff=1.00 (no overflow recorded)
+  // Note: South Shamkha has GOOD drainage infrastructure — all runoff is drained
   'Al Shamkha': {
     id: 'Al Shamkha', elevationM: 3.5, slopeIndex: 0.02,
-    soilType: 'sandy_loam', runoffCoeff: 0.80, drainEfficiency: 0.28,
+    soilType: 'sandy_loam', runoffCoeff: 0.80,
+    drainEfficiency: 0.92, // South Shamkha calibrated: excellent drainage
     infiltrationRateMmHr: 6.0, depressionStorageMm: 5.0,
     catchmentFraction: 0.78, floodDurationHr: 16,
     catchmentMultiplier: 4.0, depressionFactor: 1.8,
@@ -402,22 +425,30 @@ export const REGION_HYDROLOGY: Record<string, RegionHydrology> = {
   },
 
   // ── Baniyas ─────────────────────────────────────────────────────────────────
+  // CALIBRATED: RB2 catchment (Baniyas/Wathba) — drainEff=0.00
+  // RB2: overflow 2,211,358m³ EXCEEDS runoff 1,284,696m³ (network completely overwhelmed)
+  // This is the most critical catchment in Abu Dhabi — network is BANKRUPT
+  // Confirmed by Water Issues Report 29 Mar 2026: cases 13-18 at 24.2961, 54.6366
   'Baniyas': {
     id: 'Baniyas', elevationM: 3.2, slopeIndex: 0.02,
-    soilType: 'sandy_loam', runoffCoeff: 0.82, drainEfficiency: 0.32,
+    soilType: 'sandy_loam', runoffCoeff: 0.82,
+    drainEfficiency: 0.00, // RB2 calibrated: ZERO drainage — network overwhelmed
     infiltrationRateMmHr: 5.0, depressionStorageMm: 4.0,
-    catchmentFraction: 0.78, floodDurationHr: 12,
-    catchmentMultiplier: 3.5, depressionFactor: 1.6,
+    catchmentFraction: 0.78, floodDurationHr: 48, // very long flood duration
+    catchmentMultiplier: 6.0, depressionFactor: 2.8, // massive accumulation
   },
-
-  // ── Al Wathba ───────────────────────────────────────────────────────────────
-  // Natural lake/wetland — VERY high retention, massive catchment
+  // ── Al Wathba ─────────────────────────────────────────────────────────────────
+  // CALIBRATED: RB2 catchment — drainEff=0.00 (network completely overwhelmed)
+  // RB2 overflow 2,211,358m³ EXCEEDS total runoff 1,284,696m³
+  // Confirmed by 29 Mar 2026 Water Issues Report: cases 13-18 at 24.2961, 54.6366
+  // 59 hotspots in this area have NO drainage network (Hotspots Register)
   'Al Wathba': {
     id: 'Al Wathba', elevationM: 1.2, slopeIndex: 0.01,
-    soilType: 'sabkha', runoffCoeff: 0.95, drainEfficiency: 0.05,
+    soilType: 'sabkha', runoffCoeff: 0.95,
+    drainEfficiency: 0.00, // RB2 calibrated: network overwhelmed, zero effective drainage
     infiltrationRateMmHr: 0.3, depressionStorageMm: 50.0,
-    catchmentFraction: 0.90, floodDurationHr: 72,
-    catchmentMultiplier: 7.0, depressionFactor: 3.0, // massive natural basin
+    catchmentFraction: 0.90, floodDurationHr: 96, // 4 days flood duration
+    catchmentMultiplier: 8.0, depressionFactor: 3.5, // massive natural basin + no drainage
   },
   'Al Wathba Farms': {
     id: 'Al Wathba Farms', elevationM: 2.5, slopeIndex: 0.02,
@@ -436,7 +467,30 @@ export const REGION_HYDROLOGY: Record<string, RegionHydrology> = {
     catchmentMultiplier: 5.5, depressionFactor: 2.5,
   },
 
-  // ── North Abu Dhabi Farms ────────────────────────────────────────────────────
+  // ── Al Riyadh (calibrated from Masterplan 2022) ───────────────────────────────────────────────────────
+  // Riyadh City North: drainEff=0.97 (overflow 11,067m³ / runoff 388,335m³)
+  // Riyadh City South: drainEff=1.00 (overflow 2,129m³ / runoff 574,596m³)
+  'Al Riyadh': {
+    id: 'Al Riyadh', elevationM: 4.0, slopeIndex: 0.03,
+    soilType: 'sandy_loam', runoffCoeff: 0.75,
+    drainEfficiency: 0.97, // Riyadh North calibrated: excellent drainage
+    infiltrationRateMmHr: 8.0, depressionStorageMm: 6.0,
+    catchmentFraction: 0.65, floodDurationHr: 4,
+    catchmentMultiplier: 1.5, depressionFactor: 0.8,
+  },
+
+  // ── Shaliela (Al Shahama area) ───────────────────────────────────────────────────────
+  // Shaliela catchment: drainEff=0.87 (overflow 26,737m³ / runoff 200,766m³)
+  'Shaliela': {
+    id: 'Shaliela', elevationM: 5.0, slopeIndex: 0.04,
+    soilType: 'sandy_loam', runoffCoeff: 0.70,
+    drainEfficiency: 0.87, // Shaliela calibrated from Masterplan 2022
+    infiltrationRateMmHr: 7.0, depressionStorageMm: 6.0,
+    catchmentFraction: 0.60, floodDurationHr: 5,
+    catchmentMultiplier: 1.8, depressionFactor: 0.9,
+  },
+
+  // ── North Abu Dhabi Farms ────────────────────────────────────────────────────────────────
   'North Abu Dhabi Farms': {
     id: 'North Abu Dhabi Farms', elevationM: 5.0, slopeIndex: 0.03,
     soilType: 'agricultural', runoffCoeff: 0.52, drainEfficiency: 0.20,
