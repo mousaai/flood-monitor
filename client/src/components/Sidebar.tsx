@@ -13,6 +13,7 @@ import {
   Eye, Route, ScanLine, BookOpen, X, Radio
 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
+import { useRealWeather } from '@/hooks/useRealWeather';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import NavTooltip from '@/components/NavTooltip';
@@ -317,11 +318,8 @@ function NavContent({
 // Main Sidebar component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Sidebar() {
-  const weatherQuery = trpc.weather.getLiveData.useQuery(undefined, {
-    refetchInterval: 2 * 60 * 1000,
-    staleTime: 5 * 60 * 1000,
-  });
-  const liveRegions = weatherQuery.data?.success ? weatherQuery.data.data?.regions ?? [] : [];
+  const { data: weatherData } = useRealWeather();
+  const liveRegions = weatherData?.regions ?? [];
   const criticalCount = liveRegions.filter((r: any) => r.alertLevel === 'critical').length;
   const warningCount = liveRegions.filter((r: any) => r.alertLevel === 'warning').length;
   const watchCount = liveRegions.filter((r: any) => r.alertLevel === 'watch').length;

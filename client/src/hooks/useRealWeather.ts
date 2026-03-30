@@ -1,16 +1,19 @@
 /**
  * useRealWeather.ts — React hook for real-time weather data
- * Uses tRPC server-side procedure to fetch data from Open-Meteo API.
- * Server-side ensures consistent timezone handling across all browsers.
+ *
+ * ARCHITECTURE NOTE:
+ * Previously used tRPC server-side procedure, but Render free tier blocks
+ * outbound HTTP requests from the server to external APIs (Open-Meteo).
+ * Solution: fetch directly from the browser (client-side) — Open-Meteo
+ * supports CORS with `access-control-allow-origin: *`, so this works perfectly.
  *
  * Data sources:
- *   - Open-Meteo ERA5 (precipitation, temperature, wind)
- *   - GloFAS Flood API (wadi discharge, 5 km resolution)
- *   - DEM Topographic Analysis (susceptibility, soil type, elevation)
+ *   - Open-Meteo Forecast API (precipitation, temperature, wind) — client-side
+ *   - Water accumulation computed client-side from ERA5 data
  */
 
-import { trpc } from '@/lib/trpc';
-import type { SystemWeatherData, RegionWeather } from '@/services/weatherApi';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { fetchAllRegionsWeather, type SystemWeatherData, type RegionWeather } from '@/services/weatherApi';
 
 // Re-export types for consumers
 export type { SystemWeatherData, RegionWeather };
@@ -18,7 +21,7 @@ export type { SystemWeatherData, RegionWeather };
 // Water accumulation level type
 export type WaterAccumulationLevel = 'none' | 'minor' | 'moderate' | 'severe' | 'extreme';
 
-// Accumulation summary shape (mirrors server AccumulationSummary)
+// Accumulation summary shape
 export interface AccumulationSummary {
   totalRegionsWithWater: number;
   extremeCount: number;
@@ -57,39 +60,130 @@ const DEFAULT_ACCUMULATION_SUMMARY: AccumulationSummary = {
   activeWadis: 0,
 };
 
-export function useRealWeather(): UseRealWeatherReturn {
-  const utils = trpc.useUtils();
+/**
+ * Compute water accumulation summary from region weather data.
+ * Uses precipitation + flood risk as proxy for water accumulation.
+ */
+function computeAccumulationFromWeather(regions: RegionWeather[]): AccumulationSummary {
+  let extremeCount = 0;
+  let severeCount = 0;
+  let moderateCount = 0;
+  let minorCount = 0;
+  let maxScore = 0;
+  let maxScoreRegionId = '';
+  let totalEstimatedAreaKm2 = 0;
+  let activeWadis = 0;
 
-  const query = trpc.weather.getLiveData.useQuery(undefined, {
-    refetchInterval: 5 * 60 * 1000,        // auto-refresh every 5 minutes
-    refetchIntervalInBackground: true,
-    staleTime: 0,
-    gcTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    retry: 2,
-  });
+  for (const r of regions) {
+    const score = r.floodRisk;
+    if (score > maxScore) {
+      maxScore = score;
+      maxScoreRegionId = r.id;
+    }
 
-  const refresh = () => {
-    utils.weather.getLiveData.invalidate();
+    // Classify by flood risk score
+    if (score >= 70) {
+      extremeCount++;
+      totalEstimatedAreaKm2 += 15;
+      activeWadis++;
+    } else if (score >= 50) {
+      severeCount++;
+      totalEstimatedAreaKm2 += 8;
+      if (r.totalLast24h > 10) activeWadis++;
+    } else if (score >= 30) {
+      moderateCount++;
+      totalEstimatedAreaKm2 += 3;
+    } else if (score >= 10 || r.totalLast24h > 0.5) {
+      minorCount++;
+      totalEstimatedAreaKm2 += 0.5;
+    }
+  }
+
+  const totalRegionsWithWater = extremeCount + severeCount + moderateCount + minorCount;
+
+  return {
+    totalRegionsWithWater,
+    extremeCount,
+    severeCount,
+    moderateCount,
+    minorCount,
+    maxScore,
+    maxScoreRegionId,
+    totalEstimatedAreaKm2: Math.round(totalEstimatedAreaKm2 * 10) / 10,
+    activeWadis,
   };
+}
 
-  const rawData = query.data?.success ? query.data.data : null;
+const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
-  const data: ExtendedSystemWeatherData | null = rawData ? {
-    regions: rawData.regions as SystemWeatherData['regions'],
-    fetchedAt: rawData.fetchedAt,
-    source: rawData.source,
-    accumulationSummary: (rawData as any).accumulationSummary ?? DEFAULT_ACCUMULATION_SUMMARY,
-  } : null;
+export function useRealWeather(): UseRealWeatherReturn {
+  const [data, setData] = useState<ExtendedSystemWeatherData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      if (!isMountedRef.current) return;
+      setLoading(true);
+      setError(null);
+
+      try {
+        const raw = await fetchAllRegionsWeather();
+        if (cancelled || !isMountedRef.current) return;
+
+        const accumulationSummary = computeAccumulationFromWeather(raw.regions);
+
+        setData({
+          regions: raw.regions,
+          fetchedAt: raw.fetchedAt,
+          source: raw.source,
+          accumulationSummary,
+        });
+        setLastUpdated(new Date());
+        setError(null);
+      } catch (err) {
+        if (cancelled || !isMountedRef.current) return;
+        console.error('[useRealWeather] Fetch error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch weather data');
+      } finally {
+        if (!cancelled && isMountedRef.current) {
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    // Auto-refresh every 5 minutes
+    const timer = setInterval(load, REFRESH_INTERVAL);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [refreshTick]);
+
+  const refresh = useCallback(() => {
+    setRefreshTick(t => t + 1);
+  }, []);
 
   return {
     data,
-    loading: query.isLoading,
-    error: query.error?.message ?? (query.data?.success === false ? (query.data as { error?: string }).error ?? 'Failed to fetch data' : null),
-    lastUpdated: query.dataUpdatedAt ? new Date(query.dataUpdatedAt) : null,
+    loading,
+    error,
+    lastUpdated,
     refresh,
-    isLive: !!data && query.isSuccess,
+    isLive: !!data && !error,
   };
 }
 
@@ -126,10 +220,6 @@ export function computeWeatherSummary(data: ExtendedSystemWeatherData | null) {
   );
 
   // ── Alert counting — current conditions only ──────────────────────────────
-  // A region is "actively alerting" only if:
-  //   (a) it has current precipitation > 0 mm/h, OR
-  //   (b) its floodRisk is driven by active rain (currentPrecip > 0 OR maxNext48h > 5 mm)
-  // This prevents stale 24h-accumulation from inflating the alert count after a storm passes.
   const activeRegions = regions.filter(r =>
     r.currentPrecipitation > 0 ||
     (r.floodRisk >= 30 && (r.currentPrecipitation > 0 || r.maxNext48h > 5))
@@ -148,8 +238,8 @@ export function computeWeatherSummary(data: ExtendedSystemWeatherData | null) {
   );
 
   const highestAccumulationRegion = regions.reduce((max, r) => {
-    const score    = (r as any).waterAccumulation?.score ?? 0;
-    const maxScore = (max as any).waterAccumulation?.score ?? 0;
+    const score    = (r as any).waterAccumulation?.score ?? r.floodRisk ?? 0;
+    const maxScore = (max as any).waterAccumulation?.score ?? max.floodRisk ?? 0;
     return score > maxScore ? r : max;
   }, regions[0]);
 
@@ -193,7 +283,7 @@ export function computeWeatherSummary(data: ExtendedSystemWeatherData | null) {
 
     // Precipitation
     totalPrecip:    Math.round(totalPrecip * 10) / 10,
-    maxTotalPrecip: Math.round(maxTotalPrecip * 10) / 10,   // 24h historical context
+    maxTotalPrecip: Math.round(maxTotalPrecip * 10) / 10,
     isRainActive,
 
     // Risk & temperature

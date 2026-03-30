@@ -20,7 +20,7 @@ import {
 import { alertColor, alertLabel, type AlertLevel } from '@/data/abuDhabiRegions';
 import { useLiveRegions, type LiveSubArea, type LiveCity } from '@/hooks/useLiveRegions';
 import { useRealWeather, computeWeatherSummary } from '@/hooks/useRealWeather';
-import { trpc } from '@/lib/trpc';
+import { usePrecipHistory } from '@/services/precipHistoryApi';
 import MetricTooltip from '@/components/MetricTooltip';
 import HistoricalReplay from '@/components/HistoricalReplay';
 import { useLocation } from 'wouter';
@@ -179,7 +179,7 @@ type ChartMode = '24h' | '7d' | '30d' | '90d' | '16d_forecast';
 
 function PrecipHistoryChart({ lat, lon, regionName }: { lat: number; lon: number; regionName: string }) {
   const [mode, setMode] = useState<ChartMode>('7d');
-  const query = trpc.weather.getPrecipHistory.useQuery({ lat, lon, mode }, { staleTime: 45 * 1000, refetchInterval: 60 * 1000, retry: 1 });
+  const query = usePrecipHistory(lat, lon, mode);
   const points = query.data?.points ?? [];
   const { lang: chartLang } = useLanguage();
   const isAr = chartLang === 'ar';
@@ -245,7 +245,7 @@ function PrecipHistoryChart({ lat, lon, regionName }: { lat: number; lon: number
           <RefreshCw size={14} style={{ marginRight: '6px' }} />
           {isAr ? (mode === '90d' ? 'جاري تحميل أرشيف ERA5 (90 يوم)...' : mode === '30d' ? 'جاري تحميل أرشيف ERA5 (30 يوم)...' : 'جاري التحميل...') : (`Loading ${mode === '90d' ? 'ERA5 archive (90 days)' : mode === '30d' ? 'ERA5 archive (30 days)' : 'data'}...`)}
         </div>
-      ) : query.isError ? (
+      ) : query.error ? (
         <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.red, fontFamily: T.fontMono, fontSize: '11px' }}>{isAr ? 'فشل التحميل. حاول مجدداً.' : 'Failed to load. Retry.'}</div>
       ) : points.length === 0 ? (
         <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.textMuted, fontFamily: T.fontMono, fontSize: '11px' }}>{isAr ? 'لا توجد بيانات لهذه الفترة.' : 'No data for this period.'}</div>

@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { trpc } from '@/lib/trpc';
+import { usePrecipHistory } from '@/services/precipHistoryApi';
 import {
   Play, Pause, ChevronLeft, ChevronRight, RotateCcw,
   Droplets, AlertTriangle, Navigation, Building2, Clock,
@@ -310,11 +310,8 @@ export default function HistoricalReplay({
   const [playing, setPlaying] = useState(false);
   const playRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch data
-  const query = trpc.weather.getPrecipHistory.useQuery(
-    { lat, lon: lng, mode },
-    { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false }
-  );
+  // Fetch data — client-side direct to Open-Meteo (Render free tier blocks server-side outbound)
+  const query = usePrecipHistory(lat, lng, mode);
 
   // Build enriched hourly points with flood metrics
   const hours: HourlyPoint[] = useMemo(() => {
