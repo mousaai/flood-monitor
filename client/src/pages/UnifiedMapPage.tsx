@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import HistoricalWaterPanel from '@/components/HistoricalWaterPanel';
-import HistoricalTimelineScrubber from '@/components/HistoricalTimelineScrubber';
+import HistoricalTimelineScrubber, { type HistoricalRange, type ViewMode as HistViewMode } from '@/components/HistoricalTimelineScrubber';
 import { HISTORICAL_REGIONS, LEVEL_COLORS, FLOOD_EVENTS, type HistoricalRegion } from '@/data/historicalWater';
 import { FLOOD_ZONES, DRAINAGE_POINTS, DATA_ACCURACY, getZonesForZoom, type FloodZoneMulti } from '@/services/floodMapData';
 import { createFloodWaterLayer, type FloodWaterLayerInstance } from '@/components/FloodWaterLayer';
@@ -256,6 +256,8 @@ export default function UnifiedMapPage() {
   const [historicalYear, setHistoricalYear] = useState(2024);            // selected year
   const [historicalMonth, setHistoricalMonth] = useState(4);             // selected month (1-12)
   const [historicalEventActive, setHistoricalEventActive] = useState<{year: number; month: number} | null>(null);
+  const [historicalRange, setHistoricalRange] = useState<HistoricalRange | null>(null);  // null = month mode
+  const [historicalViewMode, setHistoricalViewMode] = useState<HistViewMode>('month');
   const historicalMarkersRef = useRef<any>(null);
 
   const { data, isLive, lastUpdated, refresh } = useRealWeather();
@@ -300,14 +302,29 @@ export default function UnifiedMapPage() {
   useEffect(() => {
     // ── Historical mode: derive multiplier from event precipitation ──
     if (historicalMode) {
-      const ev = FLOOD_EVENTS.find(e => e.year === historicalYear && e.month === historicalMonth);
-      if (ev) {
-        // Map precip mm to multiplier: 0 mm→0.3, 50 mm→1.0, 100 mm→1.6, 254 mm→2.5
-        const mult = Math.max(0.3, Math.min(2.5, 0.3 + ev.max_mm * 0.0087));
-        setPrecipMultiplier(mult);
+      if (historicalRange) {
+        // Range / year mode: use max precipitation in the range
+        const eventsInRange = FLOOD_EVENTS.filter(e => {
+          const afterFrom = e.year > historicalRange.fromYear || (e.year === historicalRange.fromYear && e.month >= historicalRange.fromMonth);
+          const beforeTo  = e.year < historicalRange.toYear   || (e.year === historicalRange.toYear   && e.month <= historicalRange.toMonth);
+          return afterFrom && beforeTo;
+        });
+        if (eventsInRange.length > 0) {
+          const maxMm = Math.max(...eventsInRange.map(e => e.max_mm));
+          const mult = Math.max(0.3, Math.min(2.5, 0.3 + maxMm * 0.0087));
+          setPrecipMultiplier(mult);
+        } else {
+          setPrecipMultiplier(0.15);
+        }
       } else {
-        // No event this month → minimal water display
-        setPrecipMultiplier(0.15);
+        // Month mode: single event
+        const ev = FLOOD_EVENTS.find(e => e.year === historicalYear && e.month === historicalMonth);
+        if (ev) {
+          const mult = Math.max(0.3, Math.min(2.5, 0.3 + ev.max_mm * 0.0087));
+          setPrecipMultiplier(mult);
+        } else {
+          setPrecipMultiplier(0.15);
+        }
       }
       return;
     }
@@ -330,7 +347,7 @@ export default function UnifiedMapPage() {
       ? Math.max(0.5, Math.min(2.5, 0.5 + precipVal * 0.4 + probFactor * 0.5))
       : Math.max(0.3, Math.min(1.2, 0.3 + probFactor * 0.9));
     setPrecipMultiplier(mult);
-  }, [timelineIndex, timelineHours, data, historicalMode, historicalYear, historicalMonth]);
+  }, [timelineIndex, timelineHours, data, historicalMode, historicalYear, historicalMonth, historicalRange]);
 
   // ── Toggle layer ──────────────────────────────────────────────────────────
   const toggleLayer = useCallback((key: LayerKey) => {
@@ -516,47 +533,88 @@ export default function UnifiedMapPage() {
   useEffect(() => {
     const map = leafletMapRef.current;
     if (!map) return;
-    // Remove existing historical markers
     if (historicalMarkersRef.current) {
       historicalMarkersRef.current.remove();
       historicalMarkersRef.current = null;
     }
-    if (!historicalEventActive) return;
-    const { year, month } = historicalEventActive;
+    if (!historicalEventActive && !historicalRange) return;
     const group = L.layerGroup();
-    HISTORICAL_REGIONS.forEach(region => {
-      const ev = region.events.find(e => e.year === year && e.month === month);
-      if (!ev || ev.level === 'safe') return;
-      const color = LEVEL_COLORS[ev.level];
-      const radius = ev.level === 'extreme' ? 8000 : ev.level === 'severe' ? 6000 : ev.level === 'moderate' ? 4000 : 2500;
-      L.circle([region.lat, region.lng], {
-        radius,
-        color,
-        fillColor: color,
-        fillOpacity: 0.35,
-        weight: 1.5,
-        opacity: 0.8,
-      }).bindPopup(`
-        <div style="font-family:Tajawal,sans-serif;direction:rtl;min-width:220px;background:#0d1117;color:#e2e8f0;border-radius:6px;padding:10px;">
-          <div style="font-size:14px;font-weight:700;color:${color};margin-bottom:4px;">${region.nameAr}</div>
-          <div style="font-size:10px;color:#64748b;margin-bottom:8px;">${region.name} · ${region.region}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-            <div style="background:rgba(0,80,200,0.15);border:1px solid rgba(0,120,255,0.3);padding:8px;border-radius:6px;text-align:center;">
-              <div style="color:#64748b;font-size:10px;">عمق المياه</div>
-              <div style="color:${color};font-weight:700;font-size:18px;">${ev.waterDepthCm}<span style="font-size:11px;"> cm</span></div>
-            </div>
-            <div style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;text-align:center;">
-              <div style="color:#64748b;font-size:10px;">الهطول</div>
-              <div style="color:#42A5F5;font-weight:700;font-size:18px;">${ev.precipMm}<span style="font-size:11px;"> mm</span></div>
+
+    if (historicalRange) {
+      // ── Range / year mode: show WORST event per region in the range ──
+      const LEVEL_ORDER = ['safe','minor','moderate','severe','extreme'];
+      HISTORICAL_REGIONS.forEach(region => {
+        const eventsInRange = region.events.filter(e => {
+          const afterFrom = e.year > historicalRange.fromYear || (e.year === historicalRange.fromYear && e.month >= historicalRange.fromMonth);
+          const beforeTo  = e.year < historicalRange.toYear   || (e.year === historicalRange.toYear   && e.month <= historicalRange.toMonth);
+          return afterFrom && beforeTo;
+        });
+        if (eventsInRange.length === 0) return;
+        const worst = eventsInRange.reduce((best, ev) =>
+          LEVEL_ORDER.indexOf(ev.level) > LEVEL_ORDER.indexOf(best.level) ? ev : best
+        );
+        if (worst.level === 'safe') return;
+        const color = LEVEL_COLORS[worst.level];
+        const totalPrecip = eventsInRange.reduce((s, e) => s + e.precipMm, 0);
+        const maxDepth = Math.max(...eventsInRange.map(e => e.waterDepthCm));
+        const radius = worst.level === 'extreme' ? 8000 : worst.level === 'severe' ? 6000 : worst.level === 'moderate' ? 4000 : 2500;
+        L.circle([region.lat, region.lng], {
+          radius, color, fillColor: color, fillOpacity: 0.35, weight: 1.5, opacity: 0.8,
+        }).bindPopup(`
+          <div style="font-family:Tajawal,sans-serif;direction:rtl;min-width:240px;background:#0d1117;color:#e2e8f0;border-radius:6px;padding:10px;">
+            <div style="font-size:14px;font-weight:700;color:${color};margin-bottom:2px;">${region.nameAr}</div>
+            <div style="font-size:10px;color:#64748b;margin-bottom:6px;">${region.name} · ${region.region}</div>
+            <div style="font-size:9px;color:#FBBF24;margin-bottom:6px;">📅 ${historicalRange.fromYear}/${historicalRange.fromMonth} → ${historicalRange.toYear}/${historicalRange.toMonth} · ${eventsInRange.length} حدث</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;">
+              <div style="background:rgba(0,80,200,0.15);border:1px solid rgba(0,120,255,0.3);padding:6px;border-radius:6px;text-align:center;">
+                <div style="color:#64748b;font-size:9px;">أقصى عمق</div>
+                <div style="color:${color};font-weight:700;font-size:15px;">${maxDepth}<span style="font-size:9px;"> cm</span></div>
+              </div>
+              <div style="background:rgba(255,255,255,0.05);padding:6px;border-radius:6px;text-align:center;">
+                <div style="color:#64748b;font-size:9px;">مجموع هطول</div>
+                <div style="color:#42A5F5;font-weight:700;font-size:15px;">${Math.round(totalPrecip)}<span style="font-size:9px;"> mm</span></div>
+              </div>
+              <div style="background:rgba(255,255,255,0.05);padding:6px;border-radius:6px;text-align:center;">
+                <div style="color:#64748b;font-size:9px;">أشد حدث</div>
+                <div style="color:#F59E0B;font-weight:700;font-size:15px;">${worst.precipMm}<span style="font-size:9px;"> mm</span></div>
+              </div>
             </div>
           </div>
-          <div style="margin-top:6px;font-size:10px;color:#475569;">📅 ${month}/${year} · ${ev.name}</div>
-        </div>
-      `, { className: 'flood-popup', maxWidth: 260 }).addTo(group);
-    });
+        `, { className: 'flood-popup', maxWidth: 280 }).addTo(group);
+      });
+    } else if (historicalEventActive) {
+      // ── Month mode: single event ──
+      const { year, month } = historicalEventActive;
+      HISTORICAL_REGIONS.forEach(region => {
+        const ev = region.events.find(e => e.year === year && e.month === month);
+        if (!ev || ev.level === 'safe') return;
+        const color = LEVEL_COLORS[ev.level];
+        const radius = ev.level === 'extreme' ? 8000 : ev.level === 'severe' ? 6000 : ev.level === 'moderate' ? 4000 : 2500;
+        L.circle([region.lat, region.lng], {
+          radius, color, fillColor: color, fillOpacity: 0.35, weight: 1.5, opacity: 0.8,
+        }).bindPopup(`
+          <div style="font-family:Tajawal,sans-serif;direction:rtl;min-width:220px;background:#0d1117;color:#e2e8f0;border-radius:6px;padding:10px;">
+            <div style="font-size:14px;font-weight:700;color:${color};margin-bottom:4px;">${region.nameAr}</div>
+            <div style="font-size:10px;color:#64748b;margin-bottom:8px;">${region.name} · ${region.region}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+              <div style="background:rgba(0,80,200,0.15);border:1px solid rgba(0,120,255,0.3);padding:8px;border-radius:6px;text-align:center;">
+                <div style="color:#64748b;font-size:10px;">عمق المياه</div>
+                <div style="color:${color};font-weight:700;font-size:18px;">${ev.waterDepthCm}<span style="font-size:11px;"> cm</span></div>
+              </div>
+              <div style="background:rgba(255,255,255,0.05);padding:8px;border-radius:6px;text-align:center;">
+                <div style="color:#64748b;font-size:10px;">الهطول</div>
+                <div style="color:#42A5F5;font-weight:700;font-size:18px;">${ev.precipMm}<span style="font-size:11px;"> mm</span></div>
+              </div>
+            </div>
+            <div style="margin-top:6px;font-size:10px;color:#475569;">📅 ${month}/${year} · ${ev.name}</div>
+          </div>
+        `, { className: 'flood-popup', maxWidth: 260 }).addTo(group);
+      });
+    }
+
     group.addTo(map);
     historicalMarkersRef.current = group;
-  }, [historicalEventActive]);
+  }, [historicalEventActive, historicalRange]);
 
   // Keep legacy L.circle markers for interactive popups (invisible fill, click-only)
   useEffect(() => {
@@ -1669,6 +1727,18 @@ export default function UnifiedMapPage() {
             onClose={() => {
               setHistoricalMode(false);
               setHistoricalEventActive(null);
+              setHistoricalRange(null);
+            }}
+            onRangeChange={(range) => {
+              setHistoricalRange(range);
+              // In range/year mode: show all events in range as markers
+              if (range) {
+                setHistoricalEventActive({ year: range.fromYear, month: range.fromMonth });
+              }
+            }}
+            onViewModeChange={(mode) => {
+              setHistoricalViewMode(mode);
+              if (mode === 'month') setHistoricalRange(null);
             }}
             lang={lang as 'ar' | 'en'}
           />
