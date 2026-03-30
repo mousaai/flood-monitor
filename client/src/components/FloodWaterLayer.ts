@@ -137,6 +137,96 @@ const FLOOD_ZONES: FZ[] = [
   { lat: 24.310, lng: 54.640, r: 0.022, boost: 2.6 },
   { lat: 24.110, lng: 52.730, r: 0.025, boost: 2.8 },
   { lat: 24.105, lng: 52.720, r: 0.020, boost: 2.6 },
+
+  // ── KIZAD / Khalifa Industrial Zone (كيزاد) ──────────────────────────────
+  { lat: 24.300, lng: 54.430, r: 0.035, boost: 4.5 }, // KIZAD main basin
+  { lat: 24.295, lng: 54.420, r: 0.028, boost: 4.2 }, // KIZAD west
+  { lat: 24.310, lng: 54.440, r: 0.025, boost: 4.0 }, // KIZAD north
+  { lat: 24.285, lng: 54.435, r: 0.022, boost: 3.8 }, // KIZAD south
+  { lat: 24.305, lng: 54.450, r: 0.020, boost: 3.6 }, // KIZAD east
+  { lat: 24.290, lng: 54.415, r: 0.018, boost: 3.5 }, // KIZAD port area
+  { lat: 24.315, lng: 54.425, r: 0.022, boost: 4.0 }, // KIZAD industrial
+  { lat: 24.280, lng: 54.445, r: 0.018, boost: 3.8 }, // KIZAD SE
+
+  // ── Khalifa City A / B / C (خليفة سيتي) ─────────────────────────────────
+  { lat: 24.415, lng: 54.590, r: 0.030, boost: 4.2 }, // Khalifa City A main
+  { lat: 24.408, lng: 54.580, r: 0.025, boost: 4.0 }, // Khalifa City A west
+  { lat: 24.422, lng: 54.600, r: 0.022, boost: 3.8 }, // Khalifa City A east
+  { lat: 24.430, lng: 54.610, r: 0.020, boost: 3.5 }, // Khalifa City B
+  { lat: 24.435, lng: 54.620, r: 0.018, boost: 3.2 }, // Khalifa City B north
+  { lat: 24.440, lng: 54.630, r: 0.016, boost: 3.0 }, // Khalifa City C
+  { lat: 24.402, lng: 54.575, r: 0.018, boost: 3.8 }, // Khalifa City A south
+
+  // ── Zayed City / MBZ City (مدينة زايد / محمد بن زايد) ───────────────────
+  { lat: 24.350, lng: 54.620, r: 0.032, boost: 4.0 }, // Zayed City main
+  { lat: 24.342, lng: 54.610, r: 0.026, boost: 3.8 }, // Zayed City west
+  { lat: 24.358, lng: 54.630, r: 0.022, boost: 3.6 }, // Zayed City east
+  { lat: 24.365, lng: 54.640, r: 0.020, boost: 3.4 }, // MBZ City north
+  { lat: 24.338, lng: 54.600, r: 0.018, boost: 3.5 }, // Zayed City south
+  { lat: 24.372, lng: 54.650, r: 0.022, boost: 3.2 }, // MBZ City main
+  { lat: 24.380, lng: 54.660, r: 0.018, boost: 3.0 }, // MBZ City east
+
+  // ── Al Shamkha (الشامخة) ─────────────────────────────────────────────────
+  { lat: 24.330, lng: 54.540, r: 0.030, boost: 4.0 }, // Al Shamkha main basin
+  { lat: 24.320, lng: 54.530, r: 0.025, boost: 3.8 }, // Al Shamkha west
+  { lat: 24.338, lng: 54.550, r: 0.022, boost: 3.6 }, // Al Shamkha east
+  { lat: 24.312, lng: 54.520, r: 0.020, boost: 3.5 }, // Al Shamkha south
+  { lat: 24.345, lng: 54.558, r: 0.018, boost: 3.2 }, // Al Shamkha north
+
+  // ── Baniyas (بني ياس) ────────────────────────────────────────────────────
+  { lat: 24.320, lng: 54.640, r: 0.028, boost: 3.8 }, // Baniyas main
+  { lat: 24.312, lng: 54.630, r: 0.022, boost: 3.6 }, // Baniyas west
+  { lat: 24.328, lng: 54.650, r: 0.020, boost: 3.4 }, // Baniyas east
+  { lat: 24.305, lng: 54.620, r: 0.018, boost: 3.2 }, // Baniyas south
+  { lat: 24.335, lng: 54.658, r: 0.016, boost: 3.0 }, // Baniyas north
+
+  // ── Al Rahba (الرحبة) ────────────────────────────────────────────────────
+  { lat: 24.505, lng: 54.580, r: 0.028, boost: 3.8 }, // Al Rahba main
+  { lat: 24.498, lng: 54.570, r: 0.022, boost: 3.6 }, // Al Rahba west
+  { lat: 24.512, lng: 54.590, r: 0.020, boost: 3.4 }, // Al Rahba east
+  { lat: 24.490, lng: 54.560, r: 0.018, boost: 3.2 }, // Al Rahba south
+  { lat: 24.520, lng: 54.598, r: 0.016, boost: 3.0 }, // Al Rahba north
+
+  // ── Al Wathba (الوثبة) ───────────────────────────────────────────────────
+  { lat: 24.268, lng: 54.610, r: 0.035, boost: 4.2 }, // Al Wathba lake area
+  { lat: 24.258, lng: 54.600, r: 0.028, boost: 4.0 }, // Al Wathba west
+  { lat: 24.278, lng: 54.620, r: 0.025, boost: 3.8 }, // Al Wathba east
+  { lat: 24.248, lng: 54.590, r: 0.022, boost: 3.6 }, // Al Wathba south
+  { lat: 24.288, lng: 54.630, r: 0.020, boost: 3.4 }, // Al Wathba north
+
+  // ── Al Falah / Ghayathi area (الفلاح / غياثي) ───────────────────────────
+  { lat: 24.230, lng: 54.580, r: 0.030, boost: 3.8 }, // Al Falah main
+  { lat: 24.220, lng: 54.570, r: 0.025, boost: 3.6 }, // Al Falah west
+  { lat: 24.240, lng: 54.590, r: 0.022, boost: 3.4 }, // Al Falah east
+
+  // ── Madinat Zayed (مدينة زايد الغربية) ──────────────────────────────────
+  { lat: 23.695, lng: 53.705, r: 0.032, boost: 3.8 }, // Madinat Zayed main
+  { lat: 23.688, lng: 53.695, r: 0.025, boost: 3.6 }, // Madinat Zayed west
+  { lat: 23.702, lng: 53.715, r: 0.022, boost: 3.4 }, // Madinat Zayed east
+
+  // ── Al Ain flood zones (العين) ───────────────────────────────────────────
+  { lat: 24.218, lng: 55.748, r: 0.028, boost: 3.5 }, // Al Ain main wadi
+  { lat: 24.208, lng: 55.738, r: 0.022, boost: 3.3 }, // Al Ain west
+  { lat: 24.228, lng: 55.758, r: 0.020, boost: 3.1 }, // Al Ain east
+  { lat: 24.195, lng: 55.728, r: 0.018, boost: 3.0 }, // Al Ain south wadi
+  { lat: 24.238, lng: 55.768, r: 0.016, boost: 2.8 }, // Al Ain north
+
+  // ── Al Dhafra / Liwa area (الظفرة / ليوا) ───────────────────────────────
+  { lat: 23.120, lng: 53.620, r: 0.040, boost: 3.5 }, // Liwa oasis basin
+  { lat: 23.110, lng: 53.610, r: 0.030, boost: 3.2 }, // Liwa west
+  { lat: 23.130, lng: 53.630, r: 0.025, boost: 3.0 }, // Liwa east
+
+  // ── Ruwais (الرويس) ──────────────────────────────────────────────────────
+  { lat: 24.108, lng: 52.728, r: 0.030, boost: 3.5 }, // Ruwais main
+  { lat: 24.100, lng: 52.718, r: 0.025, boost: 3.2 }, // Ruwais west
+  { lat: 24.116, lng: 52.738, r: 0.022, boost: 3.0 }, // Ruwais east
+
+  // ── Musaffah (مصفح) — additional points ─────────────────────────────────
+  { lat: 24.365, lng: 54.462, r: 0.025, boost: 4.5 }, // Mussafah industrial NW
+  { lat: 24.355, lng: 54.452, r: 0.020, boost: 4.2 }, // Mussafah channel
+  { lat: 24.375, lng: 54.472, r: 0.022, boost: 4.0 }, // Mussafah NE
+  { lat: 24.345, lng: 54.445, r: 0.018, boost: 3.8 }, // Mussafah SW
+  { lat: 24.385, lng: 54.480, r: 0.020, boost: 3.6 }, // Mussafah SE
 ];
 
 function zoneBoost(lat: number, lng: number): number {
