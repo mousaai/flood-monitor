@@ -755,6 +755,9 @@ export function createFloodWaterLayer(
             const density = getUrbanDensity(pLat, pLng);
             const boost   = zoneBoost(pLat, pLng);
 
+            // ONLY show in urban areas or known flood hotspots — skip pure desert
+            if (density < 0.05 && boost < 1.3 && !inRegion) { lng += globalStep; continue; }
+
             // Urban areas outside TERRAIN_REGIONS get enhanced depth
             const urbanBoost = 1.0 + density * 0.5;
 
