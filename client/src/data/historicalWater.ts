@@ -68,6 +68,9 @@ export const FLOOD_EVENTS: FloodEventDef[] = [
   { year: 2024, month: 4,  name: 'April 2024 Historic',       max_mm: 254, severity: 'extreme'  },
   { year: 2025, month: 1,  name: 'January 2025',              max_mm: 32,  severity: 'moderate' },
   { year: 2025, month: 3,  name: 'March 2025',                max_mm: 48,  severity: 'high'     },
+  { year: 2026, month: 1,  name: 'January 2026',              max_mm: 29,  severity: 'low'      },
+  { year: 2026, month: 2,  name: 'February 2026',             max_mm: 18,  severity: 'low'      },
+  { year: 2026, month: 3,  name: 'March 2026',                max_mm: 36,  severity: 'moderate' },
 ];
 
 // ── Water depth calculation (deterministic, based on region type + event) ────
@@ -262,7 +265,7 @@ export function getRegionDataForEvent(regionId: string, year: number, month: num
 }
 
 // ── Available years ───────────────────────────────────────────────────────────
-export const AVAILABLE_YEARS = [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
+export const AVAILABLE_YEARS = [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
 
 // ── Level color mapping ───────────────────────────────────────────────────────
 export const LEVEL_COLORS: Record<WaterLevel, string> = {

@@ -1,15 +1,16 @@
 /*
- * HistoricalTimelineScrubber.tsx  — Advanced Historical Timeline
- * Three view modes:
- *   "month"  — single month (original behaviour)
- *   "year"   — full year overview (12 months)
- *   "range"  — custom from/to (year+month precision)
+ * HistoricalTimelineScrubber.tsx  — Advanced Historical Timeline (v3)
  *
- * In "range" / "year" modes the scrubber shows ALL events in the period
- * as stacked bars and emits onRangeChange so the map can show cumulative data.
+ * Three view modes:
+ *   "month"  — single month (12 bars for the selected year)
+ *   "year"   — full year overview (12 months, all highlighted)
+ *   "range"  — custom from/to (year+month precision, all months shown)
+ *
+ * Key fix: range changes are emitted IMMEDIATELY via onRangeChange (no Apply button needed).
+ * The parent (UnifiedMapPage) reacts to onRangeChange to update the map markers + precipMultiplier.
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, ChevronLeft, ChevronRight, X, Calendar, Filter } from 'lucide-react';
+import { Play, Pause, ChevronLeft, ChevronRight, X, Filter } from 'lucide-react';
 import { FLOOD_EVENTS, AVAILABLE_YEARS, type FloodEventDef } from '@/data/historicalWater';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -41,7 +42,7 @@ export interface HistoricalRange {
 }
 
 interface BarSlot {
-  key: string;         // "YYYY-MM"
+  key: string;
   year: number;
   month: number;
   labelAr: string;
@@ -51,17 +52,15 @@ interface BarSlot {
   event?: FloodEventDef;
   severity: string;
   isSelected: boolean;
-  isInRange: boolean;
 }
 
-interface HistoricalTimelineScrubberProps {
+interface Props {
   year: number;
   selectedMonth: number;
   onMonthChange: (month: number) => void;
   onYearChange: (year: number) => void;
   onClose: () => void;
   lang: 'ar' | 'en';
-  // New: range mode callbacks
   onRangeChange?: (range: HistoricalRange | null) => void;
   onViewModeChange?: (mode: ViewMode) => void;
 }
@@ -72,19 +71,17 @@ function compareYM(y1: number, m1: number, y2: number, m2: number) {
   return y1 !== y2 ? y1 - y2 : m1 - m2;
 }
 
-/** Build bar slots for a given range (inclusive) */
-function buildRangeBars(
+function buildBars(
   fromYear: number, fromMonth: number,
-  toYear: number,   toMonth: number,
+  toYear: number, toMonth: number,
   selectedYear: number, selectedMonth: number,
   viewMode: ViewMode,
 ): BarSlot[] {
   const bars: BarSlot[] = [];
   let y = fromYear, m = fromMonth;
+  const maxYear = Math.max(...AVAILABLE_YEARS);
   while (compareYM(y, m, toYear, toMonth) <= 0) {
     const ev = FLOOD_EVENTS.find(e => e.year === y && e.month === m);
-    const isSelected = viewMode === 'month' && y === selectedYear && m === selectedMonth;
-    const isInRange = viewMode !== 'month';
     bars.push({
       key: toKey(y, m),
       year: y, month: m,
@@ -94,18 +91,16 @@ function buildRangeBars(
       hasEvent: !!ev,
       event: ev,
       severity: ev?.severity ?? 'none',
-      isSelected,
-      isInRange,
+      isSelected: viewMode === 'month' && y === selectedYear && m === selectedMonth,
     });
     m++;
     if (m > 12) { m = 1; y++; }
-    if (y > 2025) break;
+    if (y > maxYear + 1) break;
   }
   return bars;
 }
 
-/** Compute cumulative stats for a range */
-function computeRangeStats(bars: BarSlot[]) {
+function computeStats(bars: BarSlot[]) {
   const events = bars.filter(b => b.hasEvent);
   const totalPrecip = events.reduce((s, b) => s + b.precipMm, 0);
   const maxPrecip = events.length ? Math.max(...events.map(b => b.precipMm)) : 0;
@@ -123,15 +118,16 @@ export default function HistoricalTimelineScrubber({
   lang,
   onRangeChange,
   onViewModeChange,
-}: HistoricalTimelineScrubberProps) {
+}: Props) {
   const isAr = lang === 'ar';
+  const currentYear = new Date().getFullYear();
 
   // ── view mode ──
   const [viewMode, setViewMode] = useState<ViewMode>('month');
 
-  // ── range state ──
-  const [rangeFrom, setRangeFrom] = useState<{ year: number; month: number }>({ year: 2015, month: 1 });
-  const [rangeTo,   setRangeTo]   = useState<{ year: number; month: number }>({ year: 2025, month: 12 });
+  // ── range state (default: last 3 years to current) ──
+  const [rangeFrom, setRangeFrom] = useState({ year: 2015, month: 1 });
+  const [rangeTo,   setRangeTo]   = useState({ year: Math.min(currentYear, Math.max(...AVAILABLE_YEARS)), month: 12 });
   const [showRangePicker, setShowRangePicker] = useState(false);
 
   // ── playback ──
@@ -142,20 +138,20 @@ export default function HistoricalTimelineScrubber({
   // ── derive bars ──
   const bars = (() => {
     if (viewMode === 'month') {
-      return buildRangeBars(year, 1, year, 12, year, selectedMonth, 'month');
+      return buildBars(year, 1, year, 12, year, selectedMonth, 'month');
     }
     if (viewMode === 'year') {
-      return buildRangeBars(year, 1, year, 12, year, selectedMonth, 'year');
+      return buildBars(year, 1, year, 12, year, selectedMonth, 'year');
     }
     // range
-    return buildRangeBars(rangeFrom.year, rangeFrom.month, rangeTo.year, rangeTo.month, year, selectedMonth, 'range');
+    return buildBars(rangeFrom.year, rangeFrom.month, rangeTo.year, rangeTo.month, year, selectedMonth, 'range');
   })();
 
   const maxPrecip = Math.max(...bars.map(b => b.precipMm), 1);
-  const stats = computeRangeStats(bars);
-  const selectedBar = bars.find(b => b.isSelected) ?? bars[selectedMonth - 1];
+  const stats = computeStats(bars);
+  const selectedBar = bars.find(b => b.isSelected) ?? null;
 
-  // ── notify parent of range ──
+  // ── Emit range to parent IMMEDIATELY on any change ──
   useEffect(() => {
     if (!onRangeChange) return;
     if (viewMode === 'month') {
@@ -163,9 +159,14 @@ export default function HistoricalTimelineScrubber({
     } else if (viewMode === 'year') {
       onRangeChange({ fromYear: year, fromMonth: 1, toYear: year, toMonth: 12 });
     } else {
-      onRangeChange({ fromYear: rangeFrom.year, fromMonth: rangeFrom.month, toYear: rangeTo.year, toMonth: rangeTo.month });
+      // range mode — emit immediately
+      onRangeChange({
+        fromYear: rangeFrom.year, fromMonth: rangeFrom.month,
+        toYear: rangeTo.year,   toMonth: rangeTo.month,
+      });
     }
-  }, [viewMode, year, rangeFrom, rangeTo, onRangeChange]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, year, rangeFrom.year, rangeFrom.month, rangeTo.year, rangeTo.month]);
 
   useEffect(() => { onViewModeChange?.(viewMode); }, [viewMode, onViewModeChange]);
 
@@ -192,151 +193,38 @@ export default function HistoricalTimelineScrubber({
 
   // ── bar click ──
   const handleBarClick = useCallback((bar: BarSlot) => {
-    if (viewMode === 'month') {
-      onMonthChange(bar.month);
-    }
-    // in year/range modes clicking a bar navigates to that month
-    if (viewMode === 'year') {
+    if (viewMode === 'month' || viewMode === 'year') {
+      onYearChange(bar.year);
       onMonthChange(bar.month);
     }
     if (viewMode === 'range') {
+      // clicking a bar in range mode → zoom to that month
       onYearChange(bar.year);
       onMonthChange(bar.month);
       setViewMode('month');
     }
   }, [viewMode, onMonthChange, onYearChange]);
 
-  // ── change view mode ──
+  // ── switch mode ──
   const switchMode = (m: ViewMode) => {
     setPlaying(false);
     setViewMode(m);
     if (m === 'range') setShowRangePicker(true);
   };
 
-  const selColor = (viewMode === 'month' && selectedBar?.hasEvent)
+  // ── apply preset ──
+  const applyPreset = (from: {year: number; month: number}, to: {year: number; month: number}) => {
+    setRangeFrom(from);
+    setRangeTo(to);
+    setShowRangePicker(false);
+    // viewMode is already 'range' when picker is shown
+  };
+
+  const selColor = selectedBar?.hasEvent
     ? SEVERITY_COLOR[selectedBar.severity]
-    : stats.worstSeverity !== 'none' ? SEVERITY_COLOR[stats.worstSeverity] : '#475569';
+    : (stats.worstSeverity !== 'none' ? SEVERITY_COLOR[stats.worstSeverity] : '#475569');
 
-  // ── Range picker component ──
-  const RangePicker = () => (
-    <div style={{
-      position: 'absolute',
-      bottom: '100%',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      background: 'rgba(8,14,24,0.97)',
-      border: '1px solid rgba(251,191,36,0.4)',
-      borderRadius: '8px',
-      padding: '12px 16px',
-      zIndex: 1000,
-      minWidth: '320px',
-      boxShadow: '0 -8px 32px rgba(0,0,0,0.6)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-        <span style={{ fontSize: '11px', fontWeight: 700, color: '#FBBF24', fontFamily: 'Space Mono, monospace' }}>
-          {isAr ? 'تحديد الفترة الزمنية' : 'SELECT DATE RANGE'}
-        </span>
-        <button onClick={() => setShowRangePicker(false)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer' }}>
-          <X size={12} />
-        </button>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        {/* FROM */}
-        <div>
-          <div style={{ fontSize: '9px', color: '#64748b', fontFamily: 'monospace', marginBottom: '4px' }}>
-            {isAr ? 'من' : 'FROM'}
-          </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <select
-              value={rangeFrom.year}
-              onChange={e => setRangeFrom(p => ({ ...p, year: Number(e.target.value) }))}
-              style={{ flex: 1, background: '#0d1117', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '4px', color: '#FBBF24', fontSize: '11px', padding: '4px', fontFamily: 'monospace' }}
-            >
-              {AVAILABLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <select
-              value={rangeFrom.month}
-              onChange={e => setRangeFrom(p => ({ ...p, month: Number(e.target.value) }))}
-              style={{ flex: 1, background: '#0d1117', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '4px', color: '#90CAF9', fontSize: '11px', padding: '4px', fontFamily: 'monospace' }}
-            >
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i+1} value={i+1}>{isAr ? MONTH_NAMES_AR[i] : MONTH_NAMES_EN[i]}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* TO */}
-        <div>
-          <div style={{ fontSize: '9px', color: '#64748b', fontFamily: 'monospace', marginBottom: '4px' }}>
-            {isAr ? 'إلى' : 'TO'}
-          </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <select
-              value={rangeTo.year}
-              onChange={e => setRangeTo(p => ({ ...p, year: Number(e.target.value) }))}
-              style={{ flex: 1, background: '#0d1117', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '4px', color: '#FBBF24', fontSize: '11px', padding: '4px', fontFamily: 'monospace' }}
-            >
-              {AVAILABLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <select
-              value={rangeTo.month}
-              onChange={e => setRangeTo(p => ({ ...p, month: Number(e.target.value) }))}
-              style={{ flex: 1, background: '#0d1117', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '4px', color: '#90CAF9', fontSize: '11px', padding: '4px', fontFamily: 'monospace' }}
-            >
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i+1} value={i+1}>{isAr ? MONTH_NAMES_AR[i] : MONTH_NAMES_EN[i]}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick presets */}
-      <div style={{ marginTop: '10px' }}>
-        <div style={{ fontSize: '9px', color: '#64748b', fontFamily: 'monospace', marginBottom: '5px' }}>
-          {isAr ? 'اختصارات سريعة' : 'QUICK PRESETS'}
-        </div>
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-          {[
-            { label: isAr ? 'آخر 3 سنوات' : 'Last 3y', from: { year: 2023, month: 1 }, to: { year: 2025, month: 12 } },
-            { label: isAr ? 'آخر 5 سنوات' : 'Last 5y', from: { year: 2021, month: 1 }, to: { year: 2025, month: 12 } },
-            { label: isAr ? '10 سنوات' : '10 years', from: { year: 2015, month: 1 }, to: { year: 2025, month: 12 } },
-            { label: isAr ? 'موسم الشتاء' : 'Winter', from: { year: year, month: 11 }, to: { year: year, month: 3 } },
-            { label: isAr ? '2024 كامل' : '2024 full', from: { year: 2024, month: 1 }, to: { year: 2024, month: 12 } },
-          ].map(preset => (
-            <button
-              key={preset.label}
-              onClick={() => {
-                setRangeFrom(preset.from);
-                setRangeTo(preset.to);
-                setShowRangePicker(false);
-              }}
-              style={{
-                padding: '3px 8px', borderRadius: '4px', fontSize: '9px', cursor: 'pointer',
-                background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)',
-                color: '#FBBF24', fontFamily: 'Tajawal, sans-serif',
-              }}
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <button
-        onClick={() => setShowRangePicker(false)}
-        style={{
-          marginTop: '10px', width: '100%', padding: '6px', borderRadius: '5px',
-          background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)',
-          color: '#FBBF24', fontSize: '11px', cursor: 'pointer', fontFamily: 'Tajawal, sans-serif',
-        }}
-      >
-        {isAr ? '✓ تطبيق الفلتر' : '✓ Apply Filter'}
-      </button>
-    </div>
-  );
+  const maxAvailYear = Math.max(...AVAILABLE_YEARS);
 
   return (
     <div style={{
@@ -344,7 +232,7 @@ export default function HistoricalTimelineScrubber({
       bottom: 0,
       left: 0,
       right: 0,
-      height: viewMode === 'range' && bars.length > 24 ? '110px' : '100px',
+      height: viewMode === 'range' && bars.length > 24 ? '115px' : '100px',
       background: 'linear-gradient(to top, rgba(8,14,24,0.98) 70%, rgba(8,14,24,0.0))',
       zIndex: 998,
       display: 'flex',
@@ -355,10 +243,132 @@ export default function HistoricalTimelineScrubber({
       pointerEvents: 'none',
     }}>
 
-      {/* Range picker popup */}
+      {/* ── Range picker popup ── */}
       {showRangePicker && (
-        <div style={{ pointerEvents: 'auto', position: 'relative' }}>
-          <RangePicker />
+        <div style={{
+          pointerEvents: 'auto',
+          position: 'absolute',
+          bottom: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(8,14,24,0.97)',
+          border: '1px solid rgba(251,191,36,0.4)',
+          borderRadius: '8px',
+          padding: '12px 16px',
+          zIndex: 1000,
+          minWidth: '340px',
+          boxShadow: '0 -8px 32px rgba(0,0,0,0.6)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#FBBF24', fontFamily: 'Space Mono, monospace' }}>
+              {isAr ? 'تحديد الفترة الزمنية' : 'SELECT DATE RANGE'}
+            </span>
+            <button onClick={() => setShowRangePicker(false)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer' }}>
+              <X size={12} />
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            {/* FROM */}
+            <div>
+              <div style={{ fontSize: '9px', color: '#64748b', fontFamily: 'monospace', marginBottom: '4px' }}>
+                {isAr ? 'من' : 'FROM'}
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <select
+                  value={rangeFrom.year}
+                  onChange={e => setRangeFrom(p => ({ ...p, year: Number(e.target.value) }))}
+                  style={{ flex: 1, background: '#0d1117', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '4px', color: '#FBBF24', fontSize: '11px', padding: '4px', fontFamily: 'monospace' }}
+                >
+                  {AVAILABLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <select
+                  value={rangeFrom.month}
+                  onChange={e => setRangeFrom(p => ({ ...p, month: Number(e.target.value) }))}
+                  style={{ flex: 1, background: '#0d1117', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '4px', color: '#90CAF9', fontSize: '11px', padding: '4px', fontFamily: 'monospace' }}
+                >
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <option key={i+1} value={i+1}>{isAr ? MONTH_NAMES_AR[i] : MONTH_NAMES_EN[i]}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* TO */}
+            <div>
+              <div style={{ fontSize: '9px', color: '#64748b', fontFamily: 'monospace', marginBottom: '4px' }}>
+                {isAr ? 'إلى' : 'TO'}
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <select
+                  value={rangeTo.year}
+                  onChange={e => setRangeTo(p => ({ ...p, year: Number(e.target.value) }))}
+                  style={{ flex: 1, background: '#0d1117', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '4px', color: '#FBBF24', fontSize: '11px', padding: '4px', fontFamily: 'monospace' }}
+                >
+                  {AVAILABLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <select
+                  value={rangeTo.month}
+                  onChange={e => setRangeTo(p => ({ ...p, month: Number(e.target.value) }))}
+                  style={{ flex: 1, background: '#0d1117', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '4px', color: '#90CAF9', fontSize: '11px', padding: '4px', fontFamily: 'monospace' }}
+                >
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <option key={i+1} value={i+1}>{isAr ? MONTH_NAMES_AR[i] : MONTH_NAMES_EN[i]}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick presets */}
+          <div style={{ marginTop: '10px' }}>
+            <div style={{ fontSize: '9px', color: '#64748b', fontFamily: 'monospace', marginBottom: '5px' }}>
+              {isAr ? 'اختصارات سريعة' : 'QUICK PRESETS'}
+            </div>
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+              {[
+                { label: isAr ? 'آخر 3 سنوات' : 'Last 3y',  from: { year: maxAvailYear - 2, month: 1 }, to: { year: maxAvailYear, month: 12 } },
+                { label: isAr ? 'آخر 5 سنوات' : 'Last 5y',  from: { year: maxAvailYear - 4, month: 1 }, to: { year: maxAvailYear, month: 12 } },
+                { label: isAr ? '10 سنوات'    : '10 years',  from: { year: 2015, month: 1 },             to: { year: maxAvailYear, month: 12 } },
+                { label: isAr ? 'موسم الشتاء' : 'Winter',    from: { year: 2015, month: 11 },            to: { year: maxAvailYear, month: 3  } },
+                { label: isAr ? '2024 كامل'   : '2024 full', from: { year: 2024, month: 1 },             to: { year: 2024, month: 12 } },
+                { label: isAr ? '2026 حتى الآن' : '2026 YTD',from: { year: 2026, month: 1 },             to: { year: 2026, month: 3  } },
+              ].map(preset => (
+                <button
+                  key={preset.label}
+                  onClick={() => applyPreset(preset.from, preset.to)}
+                  style={{
+                    padding: '3px 8px', borderRadius: '4px', fontSize: '9px', cursor: 'pointer',
+                    background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)',
+                    color: '#FBBF24', fontFamily: 'Tajawal, sans-serif',
+                  }}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Live preview of selection */}
+          <div style={{ marginTop: '8px', padding: '6px 8px', background: 'rgba(251,191,36,0.05)', borderRadius: '4px', border: '1px solid rgba(251,191,36,0.15)' }}>
+            <span style={{ fontSize: '9px', color: '#FBBF24', fontFamily: 'monospace' }}>
+              {isAr ? '📅 الفترة المختارة: ' : '📅 Selected: '}
+              {rangeFrom.year}/{String(rangeFrom.month).padStart(2,'0')} → {rangeTo.year}/{String(rangeTo.month).padStart(2,'0')}
+              {' · '}
+              {(() => {
+                const evCount = FLOOD_EVENTS.filter(e => {
+                  const af = e.year > rangeFrom.year || (e.year === rangeFrom.year && e.month >= rangeFrom.month);
+                  const bt = e.year < rangeTo.year   || (e.year === rangeTo.year   && e.month <= rangeTo.month);
+                  return af && bt;
+                }).length;
+                return isAr ? `${evCount} حدث` : `${evCount} events`;
+              })()}
+            </span>
+          </div>
+
+          <div style={{ marginTop: '8px', fontSize: '9px', color: '#475569', fontFamily: 'Tajawal, sans-serif', textAlign: 'center' }}>
+            {isAr ? '✓ الخارطة تتحدث فوراً عند أي تغيير' : '✓ Map updates instantly on any change'}
+          </div>
         </div>
       )}
 
@@ -481,11 +491,9 @@ export default function HistoricalTimelineScrubber({
         {/* Stats */}
         <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', alignItems: 'center' }}>
           {viewMode === 'month' && selectedBar?.hasEvent && (
-            <>
-              <span style={{ fontSize: '10px', color: '#42A5F5', fontFamily: 'monospace' }}>
-                Precip.: <strong>{selectedBar.precipMm} mm</strong>
-              </span>
-            </>
+            <span style={{ fontSize: '10px', color: '#42A5F5', fontFamily: 'monospace' }}>
+              Precip.: <strong>{selectedBar.precipMm} mm</strong>
+            </span>
           )}
           {(viewMode === 'year' || viewMode === 'range') && stats.eventCount > 0 && (
             <>
@@ -505,14 +513,14 @@ export default function HistoricalTimelineScrubber({
           {viewMode !== 'range' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
               <button
-                onClick={() => onYearChange(Math.max(2015, year - 1))}
+                onClick={() => onYearChange(Math.max(Math.min(...AVAILABLE_YEARS), year - 1))}
                 style={{ width: '16px', height: '16px', borderRadius: '3px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#90CAF9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
                 <ChevronLeft size={8} />
               </button>
               <span style={{ fontSize: '10px', fontWeight: 700, color: '#FBBF24', fontFamily: 'monospace', minWidth: '30px', textAlign: 'center' }}>{year}</span>
               <button
-                onClick={() => onYearChange(Math.min(2025, year + 1))}
+                onClick={() => onYearChange(Math.min(maxAvailYear, year + 1))}
                 style={{ width: '16px', height: '16px', borderRadius: '3px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#90CAF9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
                 <ChevronRight size={8} />
@@ -525,7 +533,7 @@ export default function HistoricalTimelineScrubber({
             onClick={onClose}
             style={{
               display: 'flex', alignItems: 'center', gap: '3px',
-              background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)',
+              background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
               borderRadius: '5px', cursor: 'pointer', color: '#10B981',
               padding: '3px 7px', fontSize: '9px', fontFamily: 'Tajawal, sans-serif',
             }}
@@ -552,9 +560,7 @@ export default function HistoricalTimelineScrubber({
         }}
       >
         {bars.map((bar) => {
-          const barH = bar.hasEvent
-            ? Math.max(4, (bar.precipMm / maxPrecip) * 32)
-            : 3;
+          const barH = bar.hasEvent ? Math.max(4, (bar.precipMm / maxPrecip) * 32) : 3;
           const isSelected = bar.isSelected;
           const color = bar.hasEvent ? SEVERITY_COLOR[bar.severity] : '#1e3a5f';
           const opacity = isSelected ? 1 : bar.hasEvent ? (viewMode === 'month' ? 0.55 : 0.75) : 0.2;
@@ -585,7 +591,6 @@ export default function HistoricalTimelineScrubber({
                 boxShadow: isSelected ? `0 0 8px ${color}88` : bar.hasEvent && viewMode !== 'month' ? `0 0 4px ${color}44` : 'none',
                 transition: 'height 0.3s ease, background 0.3s ease',
               }} />
-              {/* Selected cursor */}
               {isSelected && (
                 <div style={{
                   position: 'absolute',
@@ -596,7 +601,6 @@ export default function HistoricalTimelineScrubber({
                   borderRadius: '1px',
                 }} />
               )}
-              {/* Event dot */}
               {bar.hasEvent && !isSelected && (
                 <div style={{
                   position: 'absolute',
@@ -620,7 +624,6 @@ export default function HistoricalTimelineScrubber({
         pointerEvents: 'none',
       }}>
         {bars.map((bar, idx) => {
-          // In range mode with many bars, only show year labels at year boundaries
           const showLabel = viewMode === 'range' && bars.length > 24
             ? (bar.month === 1 || idx === 0 || idx === bars.length - 1)
             : true;

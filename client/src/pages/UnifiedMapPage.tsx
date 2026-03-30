@@ -1731,9 +1731,12 @@ export default function UnifiedMapPage() {
             }}
             onRangeChange={(range) => {
               setHistoricalRange(range);
-              // In range/year mode: show all events in range as markers
+              // In range/year mode: clear single-event active so useEffect uses historicalRange
               if (range) {
-                setHistoricalEventActive({ year: range.fromYear, month: range.fromMonth });
+                setHistoricalEventActive(null);
+              } else {
+                // back to month mode — restore single event
+                setHistoricalEventActive({ year: historicalYear, month: historicalMonth });
               }
             }}
             onViewModeChange={(mode) => {
