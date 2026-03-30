@@ -89,34 +89,56 @@ export const AD_EMIRATE_BOUNDARY: [number, number][] = [
  * Returns true if the point is in the sea and should NOT be flooded.
  */
 function isInArabianGulf(lat: number, lng: number): boolean {
-  // Main Gulf area north of Abu Dhabi island
+  // ── Main Gulf (north of Abu Dhabi) ──────────────────────────────────────
   if (lat > 24.55 && lng > 54.00 && lng < 54.80) return true;
-  // Gulf north of Saadiyat / wider area
   if (lat > 24.58 && lng > 53.80 && lng < 55.00) return true;
-  // Gulf further north
   if (lat > 24.62 && lng > 53.50 && lng < 55.20) return true;
   if (lat > 24.70 && lng > 53.00 && lng < 55.50) return true;
   if (lat > 24.80 && lng > 52.50 && lng < 55.80) return true;
-  // ── Internal sea channels (Khors) ──────────────────────────────────
-  // Khor Al Maqta — main channel between Abu Dhabi island and mainland
-  // Narrow band: the channel itself is ~1.5 km wide, centered ~24.515
-  // Exclude the island (lng < 54.42) and mainland (lng > 54.56)
+
+  // ── Gulf waters WEST and SOUTH-WEST of Abu Dhabi island ─────────────────
+  // Open sea west of Abu Dhabi (between mainland and Qatar border)
+  if (lat > 24.20 && lat < 24.55 && lng > 51.30 && lng < 54.10) return true;
+  // Coastal waters immediately south/west of Abu Dhabi island
+  if (lat > 24.30 && lat < 24.50 && lng > 54.10 && lng < 54.35) return true;
+  // Sea area around Al Bateen / Al Mushrif coast
+  if (lat > 24.42 && lat < 24.52 && lng > 54.28 && lng < 54.42) return true;
+  // Coastal strip south of Abu Dhabi island (tidal flats / sea)
+  if (lat > 24.35 && lat < 24.46 && lng > 54.25 && lng < 54.45) return true;
+
+  // ── Khor Al Maqta channel (between Abu Dhabi island and mainland) ────────
   if (lat > 24.495 && lat < 24.540 && lng > 54.43 && lng < 54.56) return true;
-  // Sea channel between Yas Island and mainland (Khor Yas)
+  // ── Khor Yas (between Yas Island and mainland) ───────────────────────────
   if (lat > 24.52 && lat < 24.58 && lng > 54.58 && lng < 54.70) return true;
-  // ── Isolated offshore islands (not connected to mainland) ──────────────
-  // Delma Island — far offshore in Gulf (~80 km from Abu Dhabi)
+  // ── Sea between Saadiyat and mainland ────────────────────────────────────
+  if (lat > 24.53 && lat < 24.60 && lng > 54.40 && lng < 54.55) return true;
+
+  // ── Gulf south of Abu Dhabi island (sabkha / tidal flats that are sea) ───
+  // Coastal sea strip along the southern coast of Abu Dhabi island
+  if (lat > 24.38 && lat < 24.46 && lng > 54.30 && lng < 54.50) return true;
+
+  // ── Offshore islands (not connected to mainland) ─────────────────────────
+  // Delma Island
   if (lat > 24.45 && lat < 24.56 && lng > 52.20 && lng < 52.46) return true;
-  // Al Futaisi Island — small island SW of Abu Dhabi city
-  if (lat > 24.34 && lat < 24.42 && lng > 54.17 && lng < 54.27) return true;
-  // Al Aryam Island — small island NW of Abu Dhabi
-  if (lat > 24.49 && lat < 24.55 && lng > 54.28 && lng < 54.37) return true;
-  // Al Natheel Island — small island SW of Abu Dhabi
-  if (lat > 24.22 && lat < 24.28 && lng > 54.16 && lng < 54.24) return true;
-  // Abu Al Abyad Island — large island in Gulf
-  if (lat > 24.15 && lat < 24.25 && lng > 53.70 && lng < 53.90) return true;
-  // Al Sammaliyah Island — island east of Abu Dhabi
-  if (lat > 24.38 && lat < 24.46 && lng > 54.70 && lng < 54.80) return true;
+  // Sea around Delma
+  if (lat > 24.20 && lat < 24.70 && lng > 52.00 && lng < 52.60) return true;
+  // Al Futaisi Island + surrounding sea
+  if (lat > 24.30 && lat < 24.44 && lng > 54.14 && lng < 54.30) return true;
+  // Al Aryam Island + surrounding sea
+  if (lat > 24.47 && lat < 24.57 && lng > 54.25 && lng < 54.40) return true;
+  // Al Natheel Island + surrounding sea
+  if (lat > 24.20 && lat < 24.30 && lng > 54.13 && lng < 54.26) return true;
+  // Abu Al Abyad Island + surrounding sea
+  if (lat > 24.10 && lat < 24.30 && lng > 53.60 && lng < 53.95) return true;
+  // Al Sammaliyah Island + surrounding sea
+  if (lat > 24.36 && lat < 24.48 && lng > 54.68 && lng < 54.82) return true;
+  // Sir Bani Yas Island area
+  if (lat > 24.25 && lat < 24.40 && lng > 52.55 && lng < 52.70) return true;
+
+  // ── Gulf waters east of Abu Dhabi (between islands and mainland) ──────────
+  // Sea between Saadiyat/Yas and the coast
+  if (lat > 24.48 && lat < 24.62 && lng > 54.42 && lng < 54.72) return true;
+
   return false;
 }
 
