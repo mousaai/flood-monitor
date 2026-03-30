@@ -370,10 +370,12 @@ export function createFloodWaterLayer(
         if (density > maxDensity && boost < 1.8) { lng += step; continue; }
 
         // Terrain threshold: rises with rainfall (more area covered)
-        // Dense areas get a penalty that shrinks as rain increases
-        const densityPenalty = density * 0.15 * (1.0 - rainFactor * 0.80);
-        const threshold = Math.min(0.85, Math.max(0.18,
-          0.52 - densityPenalty + rainFactor * 0.28
+        // dry: threshold=0.40 → ~40% of area shows water
+        // moderate (mult=1.0): threshold=0.62 → ~62% shows water
+        // extreme (mult=2.5): threshold=0.92 → ~92% shows water
+        const densityPenalty = density * 0.12 * (1.0 - rainFactor * 0.85);
+        const threshold = Math.min(0.95, Math.max(0.22,
+          0.40 - densityPenalty + rainFactor * 0.52
         ));
         const h = terrain(pLat, pLng);
         if (h >= threshold) { lng += step; continue; }
