@@ -1,18 +1,22 @@
 /**
  * FloodWaterLayer — FastFlood-style flood visualization
  *
+ * CORRECTED ALGORITHM (v4):
+ *
+ * The key insight: water accumulates in LOW-LYING areas (wadis, drainage channels,
+ * underpasses, low-density desert depressions). High-density urban areas (buildings,
+ * elevated roads) BLOCK water flow — they should NOT be uniformly shaded.
+ *
  * THREE-LAYER hybrid approach:
  *
- * LAYER 1 — Dynamic viewport grid (zoom ≥ 10):
- *   Dense irregular patches covering the visible viewport WITHIN
- *   Abu Dhabi emirate land boundary (OSM relation 3766481).
- *   Flood threshold scales with OSM-derived urban density:
- *     density 0.9 → threshold 0.82 (very high coverage)
- *     density 0.5 → threshold 0.68 (moderate coverage)
- *     density 0.0 → threshold 0.40 (sparse / desert)
+ * LAYER 1 — Flood pool patches (zoom ≥ 10):
+ *   Patches appear at KNOWN flood-prone low points (FLOOD_ZONES) and
+ *   low-density areas with pseudo-random terrain below flood threshold.
+ *   High-density urban zones are EXCLUDED from random patches.
  *
  * LAYER 2 — Road-following flood (zoom ≥ 13):
  *   Precise flood water along known road centerlines for worst-hit areas.
+ *   Roads act as channels — water flows along them, not covering entire districts.
  *
  * LAYER 3 — Blob hotspots (zoom < 12):
  *   Classic radial gradient blobs for overview zoom levels.
@@ -66,7 +70,8 @@ function metersToPixels(meters: number, lat: number, zoom: number): number {
   return meters / mpp;
 }
 
-// ── Pseudo-random terrain height ──────────────────────────────────────────────
+// ── Pseudo-random terrain height (simulates elevation variation) ──────────────
+// Returns 0.0–1.0 where LOW values = depressions/wadis (flood-prone)
 function terrainHeight(lat: number, lng: number): number {
   const h1 = Math.sin(lat * 317.4 + lng * 211.7) * 0.5 + 0.5;
   const h2 = Math.sin(lat * 89.3  - lng * 143.1) * 0.5 + 0.5;
@@ -76,48 +81,54 @@ function terrainHeight(lat: number, lng: number): number {
 }
 
 // ── Known flood-prone area depth boosts ──────────────────────────────────────
+// These are REAL low-lying areas that flood during heavy rain events
 interface FloodZone { lat: number; lng: number; r: number; boost: number; }
 
 const FLOOD_ZONES: FloodZone[] = [
-  // Khalifa City A
-  { lat: 24.385, lng: 54.505, r: 0.08, boost: 2.8 },
-  { lat: 24.390, lng: 54.510, r: 0.06, boost: 3.0 },
-  { lat: 24.380, lng: 54.500, r: 0.05, boost: 2.5 },
-  { lat: 24.420, lng: 54.590, r: 0.07, boost: 2.8 },
-  { lat: 24.415, lng: 54.600, r: 0.06, boost: 3.2 },
-  // MBZ City
-  { lat: 24.370, lng: 54.470, r: 0.06, boost: 3.0 },
-  { lat: 24.360, lng: 54.480, r: 0.05, boost: 2.8 },
-  // Al Wathba
-  { lat: 24.340, lng: 54.575, r: 0.06, boost: 2.5 },
-  { lat: 24.270, lng: 54.610, r: 0.07, boost: 2.8 },
-  // Baniyas
-  { lat: 24.420, lng: 54.640, r: 0.07, boost: 2.6 },
-  { lat: 24.430, lng: 54.650, r: 0.05, boost: 2.4 },
-  { lat: 24.400, lng: 54.640, r: 0.06, boost: 2.5 },
-  // Ghayathi (worst hit April 2024)
-  { lat: 23.820, lng: 52.800, r: 0.08, boost: 3.5 },
-  { lat: 23.835, lng: 52.805, r: 0.07, boost: 3.8 },
-  // Al Ain
-  { lat: 24.215, lng: 55.750, r: 0.06, boost: 2.4 },
-  // Abu Dhabi Island — corrected coordinates (was in Khor Al Maqta channel)
-  { lat: 24.455, lng: 54.380, r: 0.04, boost: 1.8 },
-  { lat: 24.450, lng: 54.390, r: 0.04, boost: 2.0 },
-  { lat: 24.460, lng: 54.395, r: 0.04, boost: 1.9 }, // Al Manhal / Al Nahyan area
-  { lat: 24.445, lng: 54.375, r: 0.04, boost: 1.8 }, // Al Khalidiyah area
-  // Al Rahba
-  { lat: 24.500, lng: 54.560, r: 0.06, boost: 2.4 },
-  { lat: 24.510, lng: 54.570, r: 0.05, boost: 2.6 },
-  // Shakhbout
-  { lat: 24.340, lng: 54.580, r: 0.06, boost: 2.3 },
+  // Khalifa City A — underpasses and low-lying streets
+  { lat: 24.385, lng: 54.505, r: 0.025, boost: 3.5 },
+  { lat: 24.390, lng: 54.510, r: 0.020, boost: 3.8 },
+  { lat: 24.380, lng: 54.500, r: 0.018, boost: 3.2 },
+  { lat: 24.420, lng: 54.590, r: 0.022, boost: 3.0 },
+  { lat: 24.415, lng: 54.600, r: 0.018, boost: 3.5 },
+  // MBZ City — drainage channels and low points
+  { lat: 24.370, lng: 54.470, r: 0.020, boost: 3.2 },
+  { lat: 24.360, lng: 54.480, r: 0.018, boost: 3.0 },
+  { lat: 24.395, lng: 54.505, r: 0.022, boost: 2.8 },
+  { lat: 24.388, lng: 54.515, r: 0.020, boost: 3.0 },
+  // Al Wathba — natural depression
+  { lat: 24.340, lng: 54.575, r: 0.030, boost: 2.8 },
+  { lat: 24.270, lng: 54.610, r: 0.035, boost: 3.0 },
+  // Baniyas — low-lying residential
+  { lat: 24.420, lng: 54.640, r: 0.025, boost: 2.8 },
+  { lat: 24.430, lng: 54.650, r: 0.020, boost: 2.6 },
+  { lat: 24.400, lng: 54.640, r: 0.022, boost: 2.7 },
+  // Ghayathi — worst hit April 2024 (desert wadi)
+  { lat: 23.820, lng: 52.800, r: 0.040, boost: 4.5 },
+  { lat: 23.835, lng: 52.805, r: 0.035, boost: 4.8 },
+  { lat: 23.825, lng: 52.815, r: 0.030, boost: 4.2 },
+  // Al Ain — wadi crossings
+  { lat: 24.215, lng: 55.750, r: 0.025, boost: 2.6 },
+  { lat: 24.205, lng: 55.760, r: 0.020, boost: 2.4 },
+  // Abu Dhabi Island — low-lying streets (NOT the whole island)
+  { lat: 24.455, lng: 54.380, r: 0.012, boost: 2.0 },
+  { lat: 24.450, lng: 54.390, r: 0.010, boost: 2.2 },
+  // Al Rahba — drainage basin
+  { lat: 24.500, lng: 54.560, r: 0.025, boost: 2.6 },
+  { lat: 24.510, lng: 54.570, r: 0.020, boost: 2.8 },
+  // Shakhbout — low-lying new development
+  { lat: 24.340, lng: 54.580, r: 0.025, boost: 2.5 },
   // Khalifa City B
-  { lat: 24.400, lng: 54.660, r: 0.06, boost: 2.5 },
+  { lat: 24.400, lng: 54.660, r: 0.022, boost: 2.7 },
   // Al Shamkha / Zayed City
-  { lat: 24.300, lng: 54.630, r: 0.07, boost: 2.4 },
-  { lat: 24.310, lng: 54.640, r: 0.06, boost: 2.2 },
+  { lat: 24.300, lng: 54.630, r: 0.030, boost: 2.6 },
+  { lat: 24.310, lng: 54.640, r: 0.025, boost: 2.4 },
   // Madinat Zayed
-  { lat: 23.705, lng: 53.730, r: 0.06, boost: 2.6 },
-  { lat: 23.710, lng: 53.740, r: 0.05, boost: 2.8 },
+  { lat: 23.705, lng: 53.730, r: 0.025, boost: 2.8 },
+  { lat: 23.710, lng: 53.740, r: 0.020, boost: 3.0 },
+  // Mussafah — industrial drainage
+  { lat: 24.370, lng: 54.465, r: 0.030, boost: 3.2 },
+  { lat: 24.360, lng: 54.455, r: 0.025, boost: 3.0 },
 ];
 
 function getZoneBoost(lat: number, lng: number): number {
@@ -135,26 +146,38 @@ function getZoneBoost(lat: number, lng: number): number {
 }
 
 /**
- * Compute flood threshold for a point based on urban density + precipitation.
- * Higher density → higher threshold → more cells flood → denser visualization.
- * Wider precipitation range: multiplier 0.3 → -0.084 (dry/clear), multiplier 2.5 → +0.18 (heavy rain)
+ * CORRECTED flood threshold logic:
  *
- * Formula: threshold = 0.38 + density * 0.44 + multiplierBoost
- *   multiplier=0.3, density=0.0  → 0.38 - 0.084 = 0.296 (desert, dry)
- *   multiplier=1.0, density=0.65 → 0.38 + 0.286 + 0.0 = 0.666 (suburban, normal)
- *   multiplier=2.5, density=0.82 → 0.38 + 0.361 + 0.18 = 0.921 → capped 0.90 (dense, heavy rain)
+ * Water pools in LOW-LYING areas. High-density urban zones (buildings, elevated roads)
+ * should NOT be randomly shaded — only specific flood-prone points within them.
+ *
+ * For the random grid (Layer 1):
+ * - High urban density → HIGHER threshold needed to flood → LESS random coverage
+ *   (buildings block random flooding; only actual low points from FLOOD_ZONES flood)
+ * - Low density desert → LOWER threshold → more random flooding (wadis, depressions)
+ *
+ * The threshold here means: "terrain height must be BELOW this value to flood"
+ * So LOWER threshold = harder to flood (need very low terrain)
+ *     HIGHER threshold = easier to flood (more terrain qualifies)
+ *
+ * For desert/rural (density=0): threshold=0.55 → moderate random flooding
+ * For dense urban (density=0.9): threshold=0.25 → almost no random flooding
+ *   (urban areas flood only via FLOOD_ZONES and ROAD_SEGMENTS)
  */
 function getFloodThreshold(lat: number, lng: number, multiplier: number): number {
   const density = getUrbanDensity(lat, lng);
-  // Wide range: each unit of multiplier above 1.0 adds 0.12 to threshold
-  // multiplier 0.3 → boost = -0.084 (drier, less flooding)
-  // multiplier 1.0 → boost = 0.0   (baseline)
-  // multiplier 2.5 → boost = +0.18  (heavy rain, much more flooding)
-  const multiplierBoost = (multiplier - 1.0) * 0.12;
-  return Math.min(0.90, Math.max(0.20, 0.38 + density * 0.44 + multiplierBoost));
+  // INVERTED: high density → LOW threshold (harder to randomly flood)
+  // desert (density=0): 0.55 + multiplierBoost
+  // dense urban (density=0.9): 0.55 - 0.9*0.35 = 0.235 → almost no random patches
+  const densityPenalty = density * 0.35;
+  // multiplier boost: heavy rain raises threshold slightly (more areas flood)
+  const multiplierBoost = (multiplier - 1.0) * 0.08;
+  return Math.min(0.75, Math.max(0.15, 0.55 - densityPenalty + multiplierBoost));
 }
 
 // ── Road segment data ─────────────────────────────────────────────────────────
+// These represent KNOWN flooded road segments from historical events
+// Roads act as channels — water flows along them during floods
 interface RoadSegment {
   coords: [number, number][];
   depthCm: number;
@@ -162,67 +185,71 @@ interface RoadSegment {
 }
 
 const ROAD_SEGMENTS: RoadSegment[] = [
-  // MBZ City E-W
-  { coords: [[24.3950,54.4800],[24.3950,54.4900],[24.3950,54.5000],[24.3950,54.5100],[24.3950,54.5200],[24.3950,54.5300]], depthCm: 45, widthM: 25 },
-  { coords: [[24.3900,54.4800],[24.3900,54.4900],[24.3900,54.5000],[24.3900,54.5100],[24.3900,54.5200],[24.3900,54.5300]], depthCm: 55, widthM: 30 },
-  { coords: [[24.3850,54.4800],[24.3850,54.4900],[24.3850,54.5000],[24.3850,54.5100],[24.3850,54.5200],[24.3850,54.5300]], depthCm: 65, widthM: 30 },
-  { coords: [[24.3800,54.4800],[24.3800,54.4900],[24.3800,54.5000],[24.3800,54.5100],[24.3800,54.5200],[24.3800,54.5300]], depthCm: 70, widthM: 35 },
-  { coords: [[24.3750,54.4800],[24.3750,54.4900],[24.3750,54.5000],[24.3750,54.5100],[24.3750,54.5200],[24.3750,54.5300]], depthCm: 60, widthM: 25 },
+  // MBZ City E-W main arteries (April 2024 flood)
+  { coords: [[24.3950,54.4800],[24.3950,54.4900],[24.3950,54.5000],[24.3950,54.5100],[24.3950,54.5200],[24.3950,54.5300]], depthCm: 45, widthM: 18 },
+  { coords: [[24.3900,54.4800],[24.3900,54.4900],[24.3900,54.5000],[24.3900,54.5100],[24.3900,54.5200],[24.3900,54.5300]], depthCm: 55, widthM: 22 },
+  { coords: [[24.3850,54.4800],[24.3850,54.4900],[24.3850,54.5000],[24.3850,54.5100],[24.3850,54.5200],[24.3850,54.5300]], depthCm: 65, widthM: 22 },
+  { coords: [[24.3800,54.4800],[24.3800,54.4900],[24.3800,54.5000],[24.3800,54.5100],[24.3800,54.5200],[24.3800,54.5300]], depthCm: 70, widthM: 25 },
+  { coords: [[24.3750,54.4800],[24.3750,54.4900],[24.3750,54.5000],[24.3750,54.5100],[24.3750,54.5200],[24.3750,54.5300]], depthCm: 60, widthM: 18 },
   // MBZ City N-S
-  { coords: [[24.4000,54.4900],[24.3950,54.4900],[24.3900,54.4900],[24.3850,54.4900],[24.3800,54.4900],[24.3750,54.4900]], depthCm: 40, widthM: 20 },
-  { coords: [[24.4000,54.5000],[24.3950,54.5000],[24.3900,54.5000],[24.3850,54.5000],[24.3800,54.5000],[24.3750,54.5000]], depthCm: 55, widthM: 25 },
-  { coords: [[24.4000,54.5100],[24.3950,54.5100],[24.3900,54.5100],[24.3850,54.5100],[24.3800,54.5100],[24.3750,54.5100]], depthCm: 65, widthM: 30 },
-  { coords: [[24.4000,54.5200],[24.3950,54.5200],[24.3900,54.5200],[24.3850,54.5200],[24.3800,54.5200],[24.3750,54.5200]], depthCm: 60, widthM: 25 },
+  { coords: [[24.4000,54.4900],[24.3950,54.4900],[24.3900,54.4900],[24.3850,54.4900],[24.3800,54.4900],[24.3750,54.4900]], depthCm: 40, widthM: 15 },
+  { coords: [[24.4000,54.5000],[24.3950,54.5000],[24.3900,54.5000],[24.3850,54.5000],[24.3800,54.5000],[24.3750,54.5000]], depthCm: 55, widthM: 18 },
+  { coords: [[24.4000,54.5100],[24.3950,54.5100],[24.3900,54.5100],[24.3850,54.5100],[24.3800,54.5100],[24.3750,54.5100]], depthCm: 65, widthM: 22 },
+  { coords: [[24.4000,54.5200],[24.3950,54.5200],[24.3900,54.5200],[24.3850,54.5200],[24.3800,54.5200],[24.3750,54.5200]], depthCm: 60, widthM: 18 },
   // Khalifa City A E-W
-  { coords: [[24.4280,54.5700],[24.4280,54.5800],[24.4280,54.5900],[24.4280,54.6000],[24.4280,54.6100]], depthCm: 60, widthM: 28 },
-  { coords: [[24.4230,54.5700],[24.4230,54.5800],[24.4230,54.5900],[24.4230,54.6000],[24.4230,54.6100]], depthCm: 75, widthM: 32 },
-  { coords: [[24.4180,54.5700],[24.4180,54.5800],[24.4180,54.5900],[24.4180,54.6000],[24.4180,54.6100]], depthCm: 85, widthM: 35 },
-  { coords: [[24.4130,54.5700],[24.4130,54.5800],[24.4130,54.5900],[24.4130,54.6000],[24.4130,54.6100]], depthCm: 80, widthM: 32 },
+  { coords: [[24.4280,54.5700],[24.4280,54.5800],[24.4280,54.5900],[24.4280,54.6000],[24.4280,54.6100]], depthCm: 60, widthM: 20 },
+  { coords: [[24.4230,54.5700],[24.4230,54.5800],[24.4230,54.5900],[24.4230,54.6000],[24.4230,54.6100]], depthCm: 75, widthM: 24 },
+  { coords: [[24.4180,54.5700],[24.4180,54.5800],[24.4180,54.5900],[24.4180,54.6000],[24.4180,54.6100]], depthCm: 85, widthM: 26 },
+  { coords: [[24.4130,54.5700],[24.4130,54.5800],[24.4130,54.5900],[24.4130,54.6000],[24.4130,54.6100]], depthCm: 80, widthM: 24 },
   // Khalifa City A N-S
-  { coords: [[24.4280,54.5750],[24.4230,54.5750],[24.4180,54.5750],[24.4130,54.5750],[24.4080,54.5750]], depthCm: 55, widthM: 22 },
-  { coords: [[24.4280,54.5850],[24.4230,54.5850],[24.4180,54.5850],[24.4130,54.5850],[24.4080,54.5850]], depthCm: 70, widthM: 28 },
-  { coords: [[24.4280,54.5950],[24.4230,54.5950],[24.4180,54.5950],[24.4130,54.5950],[24.4080,54.5950]], depthCm: 80, widthM: 32 },
-  // Mussafah
-  { coords: [[24.3780,54.4550],[24.3780,54.4650],[24.3780,54.4750],[24.3780,54.4850]], depthCm: 70, widthM: 35 },
-  { coords: [[24.3720,54.4550],[24.3720,54.4650],[24.3720,54.4750],[24.3720,54.4850]], depthCm: 85, widthM: 40 },
-  { coords: [[24.3660,54.4550],[24.3660,54.4650],[24.3660,54.4750],[24.3660,54.4850]], depthCm: 90, widthM: 40 },
-  { coords: [[24.3780,54.4700],[24.3720,54.4700],[24.3660,54.4700],[24.3600,54.4700]], depthCm: 80, widthM: 35 },
-  // Abu Dhabi Island
-  { coords: [[24.4650,54.3580],[24.4630,54.3650],[24.4610,54.3720],[24.4590,54.3790],[24.4570,54.3860],[24.4550,54.3930]], depthCm: 50, widthM: 30 },
-  { coords: [[24.4560,54.3840],[24.4560,54.3900],[24.4560,54.3960]], depthCm: 58, widthM: 25 },
-  { coords: [[24.4520,54.3840],[24.4520,54.3900],[24.4520,54.3960]], depthCm: 62, widthM: 28 },
-  { coords: [[24.4560,54.3880],[24.4520,54.3880],[24.4480,54.3880]], depthCm: 60, widthM: 26 },
+  { coords: [[24.4280,54.5750],[24.4230,54.5750],[24.4180,54.5750],[24.4130,54.5750],[24.4080,54.5750]], depthCm: 55, widthM: 16 },
+  { coords: [[24.4280,54.5850],[24.4230,54.5850],[24.4180,54.5850],[24.4130,54.5850],[24.4080,54.5850]], depthCm: 70, widthM: 20 },
+  { coords: [[24.4280,54.5950],[24.4230,54.5950],[24.4180,54.5950],[24.4130,54.5950],[24.4080,54.5950]], depthCm: 80, widthM: 24 },
+  // Mussafah industrial channels
+  { coords: [[24.3780,54.4550],[24.3780,54.4650],[24.3780,54.4750],[24.3780,54.4850]], depthCm: 70, widthM: 28 },
+  { coords: [[24.3720,54.4550],[24.3720,54.4650],[24.3720,54.4750],[24.3720,54.4850]], depthCm: 85, widthM: 32 },
+  { coords: [[24.3660,54.4550],[24.3660,54.4650],[24.3660,54.4750],[24.3660,54.4850]], depthCm: 90, widthM: 32 },
+  { coords: [[24.3780,54.4700],[24.3720,54.4700],[24.3660,54.4700],[24.3600,54.4700]], depthCm: 80, widthM: 28 },
+  // Abu Dhabi Island — specific low streets only
+  { coords: [[24.4560,54.3840],[24.4560,54.3900],[24.4560,54.3960]], depthCm: 45, widthM: 18 },
+  { coords: [[24.4520,54.3840],[24.4520,54.3900],[24.4520,54.3960]], depthCm: 50, widthM: 20 },
+  { coords: [[24.4560,54.3880],[24.4520,54.3880],[24.4480,54.3880]], depthCm: 48, widthM: 18 },
   // Al Rahba
-  { coords: [[24.5050,54.5500],[24.5050,54.5600],[24.5050,54.5700],[24.5050,54.5800]], depthCm: 55, widthM: 28 },
-  { coords: [[24.4980,54.5500],[24.4980,54.5600],[24.4980,54.5700],[24.4980,54.5800]], depthCm: 65, widthM: 32 },
-  { coords: [[24.5050,54.5650],[24.4980,54.5650],[24.4910,54.5650]], depthCm: 60, widthM: 30 },
+  { coords: [[24.5050,54.5500],[24.5050,54.5600],[24.5050,54.5700],[24.5050,54.5800]], depthCm: 55, widthM: 20 },
+  { coords: [[24.4980,54.5500],[24.4980,54.5600],[24.4980,54.5700],[24.4980,54.5800]], depthCm: 65, widthM: 24 },
+  { coords: [[24.5050,54.5650],[24.4980,54.5650],[24.4910,54.5650]], depthCm: 60, widthM: 22 },
   // Shakhbout
-  { coords: [[24.3450,54.5500],[24.3450,54.5600],[24.3450,54.5700],[24.3450,54.5800],[24.3450,54.5900]], depthCm: 55, widthM: 28 },
-  { coords: [[24.3380,54.5500],[24.3380,54.5600],[24.3380,54.5700],[24.3380,54.5800],[24.3380,54.5900]], depthCm: 65, widthM: 32 },
-  { coords: [[24.3450,54.5700],[24.3380,54.5700],[24.3310,54.5700]], depthCm: 70, widthM: 35 },
+  { coords: [[24.3450,54.5500],[24.3450,54.5600],[24.3450,54.5700],[24.3450,54.5800],[24.3450,54.5900]], depthCm: 55, widthM: 20 },
+  { coords: [[24.3380,54.5500],[24.3380,54.5600],[24.3380,54.5700],[24.3380,54.5800],[24.3380,54.5900]], depthCm: 65, widthM: 24 },
+  { coords: [[24.3450,54.5700],[24.3380,54.5700],[24.3310,54.5700]], depthCm: 70, widthM: 26 },
   // Al Wathba
-  { coords: [[24.2800,54.5850],[24.2800,54.5950],[24.2800,54.6050],[24.2800,54.6150],[24.2800,54.6250]], depthCm: 65, widthM: 30 },
-  { coords: [[24.2700,54.5850],[24.2700,54.5950],[24.2700,54.6050],[24.2700,54.6150],[24.2700,54.6250]], depthCm: 80, widthM: 35 },
-  { coords: [[24.2800,54.6050],[24.2700,54.6050],[24.2600,54.6050]], depthCm: 75, widthM: 32 },
-  // Ghayathi
-  { coords: [[23.8400,52.7950],[23.8400,52.8050],[23.8400,52.8150],[23.8400,52.8250]], depthCm: 90, widthM: 40 },
-  { coords: [[23.8320,52.7950],[23.8320,52.8050],[23.8320,52.8150],[23.8320,52.8250]], depthCm: 110, widthM: 48 },
-  { coords: [[23.8400,52.8100],[23.8320,52.8100],[23.8240,52.8100]], depthCm: 120, widthM: 55 },
+  { coords: [[24.2800,54.5850],[24.2800,54.5950],[24.2800,54.6050],[24.2800,54.6150],[24.2800,54.6250]], depthCm: 65, widthM: 22 },
+  { coords: [[24.2700,54.5850],[24.2700,54.5950],[24.2700,54.6050],[24.2700,54.6150],[24.2700,54.6250]], depthCm: 80, widthM: 28 },
+  { coords: [[24.2800,54.6050],[24.2700,54.6050],[24.2600,54.6050]], depthCm: 75, widthM: 26 },
+  // Baniyas
+  { coords: [[24.4200,54.6200],[24.4200,54.6300],[24.4200,54.6400],[24.4200,54.6500]], depthCm: 60, widthM: 22 },
+  { coords: [[24.4300,54.6200],[24.4300,54.6300],[24.4300,54.6400],[24.4300,54.6500]], depthCm: 70, widthM: 26 },
+  { coords: [[24.4200,54.6350],[24.4300,54.6350],[24.4400,54.6350]], depthCm: 65, widthM: 24 },
+  // Ghayathi — wadi channels (April 2024)
+  { coords: [[23.8480,52.7950],[23.8480,52.8050],[23.8480,52.8150],[23.8480,52.8250]], depthCm: 95, widthM: 45 },
+  { coords: [[23.8400,52.7950],[23.8400,52.8050],[23.8400,52.8150],[23.8400,52.8250]], depthCm: 110, widthM: 50 },
+  { coords: [[23.8320,52.7950],[23.8320,52.8050],[23.8320,52.8150],[23.8320,52.8250]], depthCm: 130, widthM: 60 },
+  { coords: [[23.8400,52.8100],[23.8320,52.8100],[23.8240,52.8100]], depthCm: 140, widthM: 65 },
   // Al Ain
-  { coords: [[24.2250,55.7500],[24.2200,55.7500],[24.2150,55.7500],[24.2100,55.7500],[24.2050,55.7500]], depthCm: 55, widthM: 28 },
-  { coords: [[24.2200,55.7400],[24.2200,55.7500],[24.2200,55.7600],[24.2200,55.7700]], depthCm: 65, widthM: 32 },
+  { coords: [[24.2250,55.7500],[24.2200,55.7500],[24.2150,55.7500],[24.2100,55.7500],[24.2050,55.7500]], depthCm: 55, widthM: 20 },
+  { coords: [[24.2200,55.7400],[24.2200,55.7500],[24.2200,55.7600],[24.2200,55.7700]], depthCm: 65, widthM: 24 },
   // Al Shamkha / Zayed City
-  { coords: [[24.3050,54.6200],[24.3050,54.6300],[24.3050,54.6400],[24.3050,54.6500]], depthCm: 55, widthM: 28 },
-  { coords: [[24.2980,54.6200],[24.2980,54.6300],[24.2980,54.6400],[24.2980,54.6500]], depthCm: 65, widthM: 32 },
-  { coords: [[24.3050,54.6350],[24.2980,54.6350],[24.2910,54.6350]], depthCm: 60, widthM: 30 },
+  { coords: [[24.3050,54.6200],[24.3050,54.6300],[24.3050,54.6400],[24.3050,54.6500]], depthCm: 55, widthM: 20 },
+  { coords: [[24.2980,54.6200],[24.2980,54.6300],[24.2980,54.6400],[24.2980,54.6500]], depthCm: 65, widthM: 24 },
+  { coords: [[24.3050,54.6350],[24.2980,54.6350],[24.2910,54.6350]], depthCm: 60, widthM: 22 },
   // Madinat Zayed
-  { coords: [[23.7100,53.7200],[23.7100,53.7300],[23.7100,53.7400],[23.7100,53.7500]], depthCm: 70, widthM: 32 },
-  { coords: [[23.7050,53.7200],[23.7050,53.7300],[23.7050,53.7400],[23.7050,53.7500]], depthCm: 80, widthM: 38 },
-  { coords: [[23.7100,53.7350],[23.7050,53.7350],[23.7000,53.7350]], depthCm: 85, widthM: 40 },
+  { coords: [[23.7100,53.7200],[23.7100,53.7300],[23.7100,53.7400],[23.7100,53.7500]], depthCm: 70, widthM: 24 },
+  { coords: [[23.7050,53.7200],[23.7050,53.7300],[23.7050,53.7400],[23.7050,53.7500]], depthCm: 80, widthM: 30 },
+  { coords: [[23.7100,53.7350],[23.7050,53.7350],[23.7000,53.7350]], depthCm: 85, widthM: 32 },
   // Khalifa City B
-  { coords: [[24.4050,54.6350],[24.4050,54.6450],[24.4050,54.6550],[24.4050,54.6650]], depthCm: 60, widthM: 28 },
-  { coords: [[24.3980,54.6350],[24.3980,54.6450],[24.3980,54.6550],[24.3980,54.6650]], depthCm: 70, widthM: 32 },
-  { coords: [[24.4050,54.6500],[24.3980,54.6500],[24.3910,54.6500]], depthCm: 65, widthM: 30 },
+  { coords: [[24.4050,54.6350],[24.4050,54.6450],[24.4050,54.6550],[24.4050,54.6650]], depthCm: 60, widthM: 20 },
+  { coords: [[24.3980,54.6350],[24.3980,54.6450],[24.3980,54.6550],[24.3980,54.6650]], depthCm: 70, widthM: 24 },
+  { coords: [[24.4050,54.6500],[24.3980,54.6500],[24.3910,54.6500]], depthCm: 65, widthM: 22 },
 ];
 
 // ── Main factory ──────────────────────────────────────────────────────────────
@@ -254,8 +281,6 @@ export function createFloodWaterLayer(
   let animFrameId: number | null = null;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Debounced render: during zoom/pan, wait 80ms before redrawing
-  // This prevents re-drawing on every intermediate zoom step
   function render(multiplier: number, lang: 'ar' | 'en', immediate = false) {
     currentMultiplier = multiplier;
     currentLang = lang;
@@ -285,25 +310,32 @@ export function createFloodWaterLayer(
     const zoom = map.getZoom();
     const bounds = map.getBounds();
 
-    // LAYER 1: Dynamic viewport grid (zoom ≥ 10) — land areas only
-    _renderDynamicGrid(ctx, map, zoom, bounds, multiplier);
+    // LAYER 1: Flood pool patches at known low points (zoom ≥ 10)
+    if (zoom >= 10) {
+      _renderFloodPools(ctx, map, zoom, bounds, multiplier);
+    }
 
-    // LAYER 2: Road-following flood (zoom ≥ 13)
+    // LAYER 2: Road-following flood channels (zoom ≥ 13)
     if (zoom >= 13) {
       _renderRoadFlood(ctx, map, zoom, bounds, multiplier);
     }
 
-    // LAYER 3: Blob hotspots (zoom < 12 only)
+    // LAYER 3: Blob hotspots overview (zoom < 12)
     if (zoom < 12) {
       _renderBlobFlood(ctx, map, zoom, bounds, multiplier);
     }
   }
 
   /**
-   * LAYER 1: Dense irregular grid — Abu Dhabi land only.
-   * Threshold per cell = f(urban density from OSM zones).
+   * LAYER 1 (CORRECTED): Flood pools at low-lying areas only.
+   *
+   * Key changes from v3:
+   * - High urban density zones are EXCLUDED from random grid patches
+   * - Only FLOOD_ZONES (known low points) get patches in urban areas
+   * - Desert/rural areas get random patches based on terrain height
+   * - Threshold is INVERTED: high density = harder to flood randomly
    */
-  function _renderDynamicGrid(
+  function _renderFloodPools(
     ctx: CanvasRenderingContext2D,
     map: any,
     zoom: number,
@@ -320,19 +352,18 @@ export function createFloodWaterLayer(
 
     let stepLat: number, stepLng: number, patchRadiusM: number, baseDepthCm: number;
 
-    // Performance: coarser grid at high zoom (fewer points, same visual quality)
     if (zoom >= 16) {
-      stepLat = 0.0010; stepLng = 0.0012;  // was 0.0006/0.0007 — 2.8x fewer points
-      patchRadiusM = 80; baseDepthCm = 20;
+      stepLat = 0.0012; stepLng = 0.0014;
+      patchRadiusM = 60; baseDepthCm = 18;
     } else if (zoom >= 14) {
-      stepLat = 0.0022; stepLng = 0.0025;  // was 0.0015/0.0017 — 2.1x fewer points
-      patchRadiusM = 160; baseDepthCm = 25;
+      stepLat = 0.0025; stepLng = 0.0028;
+      patchRadiusM = 120; baseDepthCm = 22;
     } else if (zoom >= 12) {
-      stepLat = 0.0055; stepLng = 0.0060;  // was 0.0040/0.0045 — 1.9x fewer points
-      patchRadiusM = 380; baseDepthCm = 30;
+      stepLat = 0.0060; stepLng = 0.0068;
+      patchRadiusM = 280; baseDepthCm = 28;
     } else if (zoom >= 10) {
-      stepLat = 0.0150; stepLng = 0.0165;  // was 0.0120/0.0135 — 1.5x fewer points
-      patchRadiusM = 560; baseDepthCm = 38;
+      stepLat = 0.0160; stepLng = 0.0180;
+      patchRadiusM = 450; baseDepthCm = 35;
     } else {
       return;
     }
@@ -347,31 +378,41 @@ export function createFloodWaterLayer(
         const pLat = lat + jLat;
         const pLng = lng + jLng;
 
-        // ── KEY: Skip points outside Abu Dhabi emirate boundary ──────────
+        // Skip points outside Abu Dhabi emirate boundary
         if (!isInsideAbuDhabi(pLat, pLng)) { lng += stepLng; continue; }
 
-        // ── Threshold based on OSM urban density ─────────────────────────
-        const threshold = getFloodThreshold(pLat, pLng, multiplier);
+        const density = getUrbanDensity(pLat, pLng);
 
+        // CRITICAL FIX: Skip high-density urban areas for random patches
+        // Urban areas (density > 0.55) only flood at FLOOD_ZONES (specific low points)
+        // This prevents entire districts from being uniformly shaded
+        if (density > 0.55) { lng += stepLng; continue; }
+
+        // Check zone boost — only render if near a known flood-prone low point
+        const zoneBoost = getZoneBoost(pLat, pLng);
+
+        // For low-density areas: use terrain height + threshold
+        // For medium-density (0.3-0.55): require zone boost
+        if (density > 0.30 && zoneBoost < 1.5) { lng += stepLng; continue; }
+
+        const threshold = getFloodThreshold(pLat, pLng, multiplier);
         const h = terrainHeight(pLat, pLng);
+
         if (h < threshold) {
           const floodFraction = (threshold - h) / threshold;
-          const zoneBoost = getZoneBoost(pLat, pLng);
-          const density = getUrbanDensity(pLat, pLng);
-          // Urban areas: full depth; rural/desert: strongly reduced at low zoom
-          // At zoom 10, desert areas (density≈0) get factor 0.08 → nearly invisible
-          const desertSuppression = zoom <= 10 ? 0.08 : 0.45;
-          const urbanFactor = desertSuppression + density * (zoom <= 10 ? 0.80 : 0.60);
-          const depthCm = baseDepthCm * multiplier * floodFraction * zoneBoost * urbanFactor;
+          // Depth scales with: base × multiplier × flood fraction × zone boost
+          // Desert areas get reduced depth at low zoom
+          const zoomFactor = zoom <= 10 ? 0.5 : 0.8;
+          const depthCm = baseDepthCm * multiplier * floodFraction * zoneBoost * zoomFactor;
 
-          if (depthCm >= 2) {
+          if (depthCm >= 3) {
             const [r, g, b, alpha] = depthToRgba(depthCm);
             if (alpha > 0.01) {
               const pt = map.latLngToContainerPoint([pLat, pLng]);
               const rpx = metersToPixels(patchRadiusM, pLat, zoom);
               if (rpx >= 1) {
-                const rx = rpx * (1.0 + Math.sin(pLat * 211 + pLng * 317) * 0.25);
-                const ry = rpx * (0.75 + Math.cos(pLat * 149 + pLng * 251) * 0.20);
+                const rx = rpx * (1.0 + Math.sin(pLat * 211 + pLng * 317) * 0.22);
+                const ry = rpx * (0.72 + Math.cos(pLat * 149 + pLng * 251) * 0.18);
                 const angle = Math.sin(pLat * 97 + pLng * 131) * 0.5;
 
                 ctx.save();
@@ -381,9 +422,9 @@ export function createFloodWaterLayer(
 
                 const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
                 grad.addColorStop(0.00, `rgba(${r},${g},${b},${alpha.toFixed(3)})`);
-                grad.addColorStop(0.45, `rgba(${r},${g},${b},${(alpha * 0.80).toFixed(3)})`);
-                grad.addColorStop(0.70, `rgba(${r},${g},${b},${(alpha * 0.45).toFixed(3)})`);
-                grad.addColorStop(0.88, `rgba(${r},${g},${b},${(alpha * 0.15).toFixed(3)})`);
+                grad.addColorStop(0.45, `rgba(${r},${g},${b},${(alpha * 0.75).toFixed(3)})`);
+                grad.addColorStop(0.72, `rgba(${r},${g},${b},${(alpha * 0.35).toFixed(3)})`);
+                grad.addColorStop(0.90, `rgba(${r},${g},${b},${(alpha * 0.10).toFixed(3)})`);
                 grad.addColorStop(1.00, `rgba(${r},${g},${b},0)`);
 
                 ctx.fillStyle = grad;
@@ -402,7 +443,8 @@ export function createFloodWaterLayer(
   }
 
   /**
-   * LAYER 2: Road-following flood for known worst-hit areas (zoom ≥ 13).
+   * LAYER 2: Road-following flood for known worst-hit road segments (zoom ≥ 13).
+   * Roads act as channels — water flows ALONG them, not covering entire districts.
    */
   function _renderRoadFlood(
     ctx: CanvasRenderingContext2D,
@@ -437,38 +479,38 @@ export function createFloodWaterLayer(
 
       ctx.save();
 
-      // Outer glow
+      // Outer glow (wide, transparent)
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-      ctx.strokeStyle = `rgba(${r},${g},${b},${(alpha * 0.35).toFixed(3)})`;
-      ctx.lineWidth = widthPx * 2.2;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${(alpha * 0.25).toFixed(3)})`;
+      ctx.lineWidth = widthPx * 2.0;
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       ctx.stroke();
 
-      // Main flood fill
+      // Main flood fill (road width)
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-      ctx.strokeStyle = `rgba(${r},${g},${b},${(alpha * 0.80).toFixed(3)})`;
-      ctx.lineWidth = widthPx * 1.3;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${(alpha * 0.72).toFixed(3)})`;
+      ctx.lineWidth = widthPx;
       ctx.stroke();
 
-      // Deep channel
+      // Deep channel center
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-      ctx.strokeStyle = `rgba(${r},${g},${b},${(alpha * 0.40).toFixed(3)})`;
-      ctx.lineWidth = widthPx * 0.4;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${(alpha * 0.38).toFixed(3)})`;
+      ctx.lineWidth = widthPx * 0.35;
       ctx.stroke();
 
-      // Intersection pools
+      // Intersection pools (where roads cross = deeper water)
       pts.forEach((pt, i) => {
         if (i === 0 || i === pts.length - 1) return;
-        const poolR = widthPx * 1.1;
+        const poolR = widthPx * 0.9;
         const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, poolR);
-        grad.addColorStop(0, `rgba(${r},${g},${b},${(alpha * 0.85).toFixed(3)})`);
-        grad.addColorStop(0.5, `rgba(${r},${g},${b},${(alpha * 0.55).toFixed(3)})`);
+        grad.addColorStop(0, `rgba(${r},${g},${b},${(alpha * 0.80).toFixed(3)})`);
+        grad.addColorStop(0.5, `rgba(${r},${g},${b},${(alpha * 0.45).toFixed(3)})`);
         grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
         ctx.fillStyle = grad;
         ctx.beginPath();
@@ -481,9 +523,7 @@ export function createFloodWaterLayer(
   }
 
   /**
-   * Draw an irregular blob (not a perfect circle) using a polar polygon
-   * with per-vertex radius jitter driven by the hotspot coordinates.
-   * This breaks the "uniform circle" appearance seen at low zoom.
+   * Draw an irregular blob for overview zoom levels
    */
   function _drawIrregularBlob(
     ctx: CanvasRenderingContext2D,
@@ -492,17 +532,15 @@ export function createFloodWaterLayer(
     r: number, g: number, b: number, alpha: number,
     seed: number
   ) {
-    const N = 14; // polygon vertices
+    const N = 14;
     const pts: [number, number][] = [];
     for (let i = 0; i < N; i++) {
       const angle = (i / N) * Math.PI * 2;
-      // Jitter radius per vertex: ±30% using sin-based pseudo-random
       const jitter = 0.70 + 0.30 * Math.abs(Math.sin(seed * 13.7 + i * 2.39));
       const vx = Math.cos(angle) * rx * jitter;
       const vy = Math.sin(angle) * ry * jitter;
       pts.push([vx, vy]);
     }
-    // Smooth the polygon using a simple Catmull-Rom-like pass
     ctx.save();
     ctx.translate(cx, cy);
     const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(rx, ry));
@@ -543,7 +581,6 @@ export function createFloodWaterLayer(
       if (hs.lat < bounds.getSouth() - latSpan * pad) return;
       if (hs.lng > bounds.getEast()  + lngSpan * pad) return;
       if (hs.lng < bounds.getWest()  - lngSpan * pad) return;
-      // ✅ Skip hotspots outside Abu Dhabi land boundary (sea, Gulf, channels)
       if (!isInsideAbuDhabi(hs.lat, hs.lng)) return;
       const effectiveDepth = hs.baseDepth * multiplier * hs.intensity;
       if (effectiveDepth < 3) return;
@@ -551,7 +588,6 @@ export function createFloodWaterLayer(
       const rpx = metersToPixels(hs.radius, hs.lat, zoom);
       if (rpx < 2) return;
       const [r, g, b, alpha] = depthToRgba(effectiveDepth);
-      // Use irregular blob instead of perfect circle
       const rx = rpx * (1.05 + Math.sin(hs.lat * 211 + hs.lng * 317) * 0.20);
       const ry = rpx * (0.80 + Math.cos(hs.lat * 149 + hs.lng * 251) * 0.18);
       const seed = hs.lat * 1000 + hs.lng;
@@ -559,8 +595,6 @@ export function createFloodWaterLayer(
     });
   }
 
-  // During active zoom/pan: use debounced render (80ms delay)
-  // On zoomend/moveend: render immediately for crisp final result
   function onMapMove()   { render(currentMultiplier, currentLang, false); }
   function onMapSettle() { render(currentMultiplier, currentLang, true); }
 
