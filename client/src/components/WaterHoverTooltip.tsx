@@ -98,8 +98,8 @@ const REGION_BOXES: RegionBox[] = [
   [24.395, 24.445, 54.555, 54.625, 'Khalifa City A',     'خليفة سيتي A',          75, 18.0,  'severe'],
   [24.420, 24.455, 54.595, 54.655, 'Khalifa City B',     'خليفة سيتي B',          65, 12.0,  'moderate'],
 
-  // ── Yas Island ──
-  [24.460, 24.510, 54.580, 54.645, 'Yas Island',         'جزيرة ياس',             35, 25.0,  'minor'],
+  // ── Yas Island (tightened to actual island bounds, not inland areas) ──
+  [24.470, 24.510, 54.590, 54.645, 'Yas Island',         'جزيرة ياس',             35, 25.0,  'minor'],
 
   // ── Al Raha Beach ──
   [24.465, 24.500, 54.560, 54.600, 'Al Raha Beach',      'شاطئ الراحة',           40,  8.5,  'minor'],
@@ -124,8 +124,13 @@ const REGION_BOXES: RegionBox[] = [
   // ── ICAD ──
   [24.335, 24.395, 54.530, 54.600, 'ICAD',               'إيكاد',                 82, 35.0,  'severe'],
 
+  // ── Sweihan Road Corridor ──
+  [24.220, 24.270, 54.640, 54.740, 'Sweihan Road',       'شارع سويحان',            92, 18.0,  'severe'],
+  [24.270, 24.320, 54.640, 54.720, 'Al Shamkha South',   'الشامخة الجنوبية',       88, 22.0,  'severe'],
+
   // ── Al Falah ──
   [24.195, 24.255, 54.540, 54.620, 'Al Falah',           'الفلاح',                72, 28.0,  'severe'],
+  [24.195, 24.255, 54.620, 54.740, 'Al Falah East',      'الفلاح الشرقي',          80, 20.0,  'severe'],
 
   // ── North Abu Dhabi Farms ──
   [24.555, 24.620, 54.400, 54.510, 'North Abu Dhabi Farms','مزارع شمال أبوظبي',   45, 85.0,  'minor'],
