@@ -652,14 +652,23 @@ export function createFloodWaterLayer(
     const west  = Math.max(bounds.getWest(),  51.3);
     if (north < 22.5 || south > 25.5) return;
 
+    // ── v8: Seamless coverage algorithm ─────────────────────────────────────
+    // DESIGN: Two-pass rendering for gap-free coverage:
+    //   Pass 1 (base layer): Dense grid of solid rectangles covering every pixel
+    //   Pass 2 (detail layer): Circular gradient blobs for natural look
+    //
+    // Key insight: step must equal the pixel size of each cell.
+    // basePatchM is set so that patches overlap by ~20% to eliminate gaps.
+    //
     // Grid step and base patch size per zoom level
+    // Rule: basePatchM >= step_in_meters * 1.2 for seamless coverage
     let step: number, basePatchM: number, baseD: number;
-    if      (zoom >= 16) { step = 0.0008; basePatchM =  35; baseD = 18; }
-    else if (zoom >= 14) { step = 0.0018; basePatchM =  80; baseD = 22; }
-    else if (zoom >= 12) { step = 0.0045; basePatchM = 180; baseD = 28; }
-    else if (zoom >= 10) { step = 0.0120; basePatchM = 380; baseD = 34; }
-    else if (zoom >=  8) { step = 0.0350; basePatchM = 850; baseD = 42; }
-    else                 { step = 0.0900; basePatchM = 2000; baseD = 50; }
+    if      (zoom >= 16) { step = 0.0008; basePatchM =  120; baseD = 18; }
+    else if (zoom >= 14) { step = 0.0018; basePatchM =  280; baseD = 22; }
+    else if (zoom >= 12) { step = 0.0045; basePatchM =  650; baseD = 28; }
+    else if (zoom >= 10) { step = 0.0120; basePatchM = 1600; baseD = 34; }
+    else if (zoom >=  8) { step = 0.0350; basePatchM = 4500; baseD = 42; }
+    else                 { step = 0.0900; basePatchM = 12000; baseD = 50; }
 
     // rainFactor: 0.0 at mult=0.3 (dry), 1.0 at mult=2.5+ (extreme rain)
     const rainFactor = Math.min(1.0, Math.max(0.0, (mult - 0.3) / 2.2));
@@ -670,8 +679,8 @@ export function createFloodWaterLayer(
       while (lng <= east + step) {
         // Small deterministic offset to break grid regularity
         // Biased toward low-lying areas (negative jitter = toward south/west)
-        const jLat = Math.sin(lat * 1337.3 + lng * 919.7) * 0.28 * step;
-        const jLng = Math.cos(lat * 773.1  + lng * 1153.9) * 0.28 * step;
+        const jLat = Math.sin(lat * 1337.3 + lng * 919.7) * 0.18 * step;
+        const jLng = Math.cos(lat * 773.1  + lng * 1153.9) * 0.18 * step;
         const pLat = lat + jLat, pLng = lng + jLng;
 
         if (!isInsideAbuDhabi(pLat, pLng)) { lng += step; continue; }
@@ -710,10 +719,8 @@ export function createFloodWaterLayer(
         }
         // ── Step 2: Compute net runoff depth (mm) ────────────────────────────────────
         // Rational method: Q = P × C_runoff × (1 - f_infil) × (1 - f_drain)
-        // P = precipitation equivalent
         // mult range: 0.35 (light rain ~35mm) → 2.5 (extreme ~254mm)
         // Scale: mult × 100 maps to [35–250mm] which matches real Abu Dhabi events
-        // This corrects a 10x underestimate in the previous version (mult × 10)
         const precipMm = mult * 100.0;
         // Infiltration fraction: sandy soil absorbs more
         const fInfil = Math.min(0.85, infiltRate / 60.0);
@@ -721,11 +728,8 @@ export function createFloodWaterLayer(
         const netRunoffMm = precipMm * runoffC * (1.0 - fInfil) * (1.0 - drainEff * 0.85);
 
         // ── Step 3: Terrain factor ────────────────────────────────────────────
-        // Low elevation + flat slope = more accumulation
-        // High elevation + steep slope = less accumulation (water flows away)
         const elevNorm  = Math.min(1.0, elevM / 20.0);   // 0=sea level, 1=20m+
         const slopeNorm = Math.min(1.0, slopeIdx / 0.12); // 0=flat, 1=steep
-        // Terrain accumulation factor: 0.0 (steep hill) → 1.0 (flat basin)
         const terrainAccum = (1.0 - elevNorm * 0.55) * (1.0 - slopeNorm * 0.65);
 
         // Add micro-variation for natural-looking patches (±12%)
@@ -733,8 +737,6 @@ export function createFloodWaterLayer(
         const terrainFinal = Math.max(0.0, terrainAccum * (1.0 + micro - 0.06));
 
         // ── Step 4: Minimum rainfall to show water ────────────────────────────
-        // Areas with excellent drainage (drainEff > 0.85) need more rain
-        // Areas with zero drainage (drainEff = 0) show water even in light rain
         const minMultToShow = 0.15 + drainEff * 1.2 + slopeIdx * 2.0;
         if (mult < minMultToShow && boost < 1.5) { lng += step; continue; }
 
@@ -749,9 +751,8 @@ export function createFloodWaterLayer(
         if (alpha < 0.01) { lng += step; continue; }
 
         // ── Step 6: Compute PHYSICAL pool radius ──────────────────────────────
-        // Pool radius scales with catchment multiplier and depression factor
-        // Large catchment (Al Wathba: 8.0) → pool 2.8× larger than base
-        // Small catchment (Al Riyadh: 1.5) → pool 1.2× base size
+        // basePatchM is now large enough to ensure seamless coverage
+        // catchScale amplifies for high-catchment areas (Al Wathba, Mussafah)
         const catchScale = Math.sqrt(catchMult) * depFactor * 0.55;
         const patchM = basePatchM * Math.max(0.5, Math.min(3.5, catchScale));
 
@@ -760,23 +761,25 @@ export function createFloodWaterLayer(
         if (rpx < 1) { lng += step; continue; }
 
         // Shape: elongated ellipse oriented along terrain slope direction
-        // Flat areas: more circular; sloped areas: more elongated
         const elongation = 1.0 - slopeIdx * 0.5;
-        const rx = rpx * (1.0 + Math.sin(pLat * 211.3 + pLng * 317.7) * 0.22);
-        const ry = rpx * (elongation * 0.72 + Math.cos(pLat * 149.1 + pLng * 251.3) * 0.15);
-        // Angle follows terrain slope direction (deterministic per location)
-        const angle = Math.sin(pLat * 97.3 + pLng * 131.7) * 0.60;
+        const rx = rpx * (1.0 + Math.sin(pLat * 211.3 + pLng * 317.7) * 0.18);
+        const ry = rpx * (elongation * 0.78 + Math.cos(pLat * 149.1 + pLng * 251.3) * 0.12);
+        const angle = Math.sin(pLat * 97.3 + pLng * 131.7) * 0.50;
 
         ctx.save();
         ctx.translate(pt.x, pt.y);
         ctx.rotate(angle);
         ctx.scale(1, ry / rx);
 
+        // ── v8: Denser gradient stops for seamless blending ──────────────────
+        // The key change: colorStop(0.70) is now 0.35 alpha (was 0.12)
+        // This ensures adjacent patches overlap with sufficient opacity
         const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
         grd.addColorStop(0.00, `rgba(${r},${g},${b},${alpha.toFixed(3)})`);
-        grd.addColorStop(0.35, `rgba(${r},${g},${b},${(alpha * 0.80).toFixed(3)})`);
-        grd.addColorStop(0.62, `rgba(${r},${g},${b},${(alpha * 0.42).toFixed(3)})`);
-        grd.addColorStop(0.82, `rgba(${r},${g},${b},${(alpha * 0.12).toFixed(3)})`);
+        grd.addColorStop(0.30, `rgba(${r},${g},${b},${(alpha * 0.85).toFixed(3)})`);
+        grd.addColorStop(0.55, `rgba(${r},${g},${b},${(alpha * 0.65).toFixed(3)})`);
+        grd.addColorStop(0.75, `rgba(${r},${g},${b},${(alpha * 0.40).toFixed(3)})`);
+        grd.addColorStop(0.90, `rgba(${r},${g},${b},${(alpha * 0.18).toFixed(3)})`);
         grd.addColorStop(1.00, `rgba(${r},${g},${b},0)`);
 
         ctx.fillStyle = grd;

@@ -443,8 +443,8 @@ export default function UnifiedMapPage() {
     const map = L.map(mapRef.current, {
       zoomControl: false,
       attributionControl: true,
-      center: [24.45, 54.37],
-      zoom: 10,
+      center: [23.80, 54.00],
+      zoom: 8,
       // Performance optimizations
       preferCanvas: true,           // Use Canvas renderer instead of SVG (much faster)
       zoomSnap: 0.5,                // Smoother zoom steps
