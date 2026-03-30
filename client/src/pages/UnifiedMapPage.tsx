@@ -541,7 +541,7 @@ export default function UnifiedMapPage() {
     const group = L.layerGroup();
 
     if (historicalRange) {
-      // ── Range / year mode: show WORST event per region in the range ──
+      // ── Range / year mode: invisible click-only markers (water shown by FloodWaterLayer canvas) ──
       const LEVEL_ORDER = ['safe','minor','moderate','severe','extreme'];
       HISTORICAL_REGIONS.forEach(region => {
         const eventsInRange = region.events.filter(e => {
@@ -557,9 +557,9 @@ export default function UnifiedMapPage() {
         const color = LEVEL_COLORS[worst.level];
         const totalPrecip = eventsInRange.reduce((s, e) => s + e.precipMm, 0);
         const maxDepth = Math.max(...eventsInRange.map(e => e.waterDepthCm));
-        const radius = worst.level === 'extreme' ? 8000 : worst.level === 'severe' ? 6000 : worst.level === 'moderate' ? 4000 : 2500;
+        // Invisible circle — click-only for popup, no visual fill or border
         L.circle([region.lat, region.lng], {
-          radius, color, fillColor: color, fillOpacity: 0.35, weight: 1.5, opacity: 0.8,
+          radius: 3000, color: 'transparent', fillColor: 'transparent', fillOpacity: 0, weight: 0, opacity: 0,
         }).bindPopup(`
           <div style="font-family:Tajawal,sans-serif;direction:rtl;min-width:240px;background:#0d1117;color:#e2e8f0;border-radius:6px;padding:10px;">
             <div style="font-size:14px;font-weight:700;color:${color};margin-bottom:2px;">${region.nameAr}</div>
@@ -583,15 +583,15 @@ export default function UnifiedMapPage() {
         `, { className: 'flood-popup', maxWidth: 280 }).addTo(group);
       });
     } else if (historicalEventActive) {
-      // ── Month mode: single event ──
+      // ── Month mode: invisible click-only markers (water shown by FloodWaterLayer canvas) ──
       const { year, month } = historicalEventActive;
       HISTORICAL_REGIONS.forEach(region => {
         const ev = region.events.find(e => e.year === year && e.month === month);
         if (!ev || ev.level === 'safe') return;
         const color = LEVEL_COLORS[ev.level];
-        const radius = ev.level === 'extreme' ? 8000 : ev.level === 'severe' ? 6000 : ev.level === 'moderate' ? 4000 : 2500;
+        // Invisible circle — click-only for popup, no visual fill or border
         L.circle([region.lat, region.lng], {
-          radius, color, fillColor: color, fillOpacity: 0.35, weight: 1.5, opacity: 0.8,
+          radius: 2500, color: 'transparent', fillColor: 'transparent', fillOpacity: 0, weight: 0, opacity: 0,
         }).bindPopup(`
           <div style="font-family:Tajawal,sans-serif;direction:rtl;min-width:220px;background:#0d1117;color:#e2e8f0;border-radius:6px;padding:10px;">
             <div style="font-size:14px;font-weight:700;color:${color};margin-bottom:4px;">${region.nameAr}</div>

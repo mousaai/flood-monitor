@@ -383,12 +383,12 @@ export default function HistoricalReplay({
     );
   }
 
-  if (query.isError || hours.length === 0) {
+  if (query.error || hours.length === 0) {
     return (
       <div style={{ padding: '16px', textAlign: 'center', color: T.red, fontFamily: T.fontMono, fontSize: '11px' }}>
         <AlertTriangle size={14} style={{ marginBottom: '4px' }} />
         <div>Failed to load historical data</div>
-        <button onClick={() => query.refetch()} style={{ marginTop: '8px', padding: '4px 12px', background: 'rgba(66,165,245,0.1)', border: '1px solid rgba(66,165,245,0.3)', borderRadius: '3px', color: T.blue, fontSize: '10px', cursor: 'pointer', fontFamily: T.fontMono }}>Retry</button>
+        <button onClick={() => window.location.reload()} style={{ marginTop: '8px', padding: '4px 12px', background: 'rgba(66,165,245,0.1)', border: '1px solid rgba(66,165,245,0.3)', borderRadius: '3px', color: T.blue, fontSize: '10px', cursor: 'pointer', fontFamily: T.fontMono }}>Retry</button>
       </div>
     );
   }
