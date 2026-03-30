@@ -708,11 +708,13 @@ export function createFloodWaterLayer(
             runoffC    = hyd.runoffCoeff;
           }
         }
-
-        // ── Step 2: Compute net runoff depth (mm) ────────────────────────────
+        // ── Step 2: Compute net runoff depth (mm) ────────────────────────────────────
         // Rational method: Q = P × C_runoff × (1 - f_infil) × (1 - f_drain)
-        // P = precipitation equivalent (mult × 10 mm baseline)
-        const precipMm = mult * 10.0;
+        // P = precipitation equivalent
+        // mult range: 0.35 (light rain ~35mm) → 2.5 (extreme ~254mm)
+        // Scale: mult × 100 maps to [35–250mm] which matches real Abu Dhabi events
+        // This corrects a 10x underestimate in the previous version (mult × 10)
+        const precipMm = mult * 100.0;
         // Infiltration fraction: sandy soil absorbs more
         const fInfil = Math.min(0.85, infiltRate / 60.0);
         // Net runoff after infiltration and drainage
