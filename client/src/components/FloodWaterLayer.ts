@@ -342,19 +342,33 @@ export function createFloodWaterLayer(
         const density = getUrbanDensity(pLat, pLng);
         const boost = zoneBoost(pLat, pLng);
 
-        // Skip only very high density areas UNLESS they are known flood zones
-        if (density > 0.65 && boost < 2.0) { lng += step; continue; }
-        if (density > 0.50 && boost < 1.5) { lng += step; continue; }
-        if (density > 0.30 && boost < 1.3) { lng += step; continue; }
+        // ── Rainfall-adaptive density filter ─────────────────────────────────
+        // mult=0.30 (dry)  → only low-density areas show water
+        // mult=1.00 (10mm) → medium density areas start showing
+        // mult=2.50 (254mm)→ ALL areas including dense urban show water
+        //
+        // rainFactor: 0.0 at mult=0.3 (dry), 1.0 at mult=2.5+ (extreme rain)
+        const rainFactor = Math.min(1.0, Math.max(0.0, (mult - 0.3) / 2.2));
 
-        const densityPenalty = density * 0.20;
-        const threshold = Math.min(0.78, Math.max(0.15, 0.55 - densityPenalty + (mult - 1) * 0.09));
+        // Maximum density allowed to show water — rises with rainfall
+        // dry: max 0.30 density, extreme rain: max 1.0 (all areas)
+        const maxDensity = 0.30 + rainFactor * 0.70;
+        if (density > maxDensity && boost < 1.8) { lng += step; continue; }
+
+        // Terrain threshold: rises with rainfall (more area covered)
+        // Dense areas get a penalty that shrinks as rain increases
+        const densityPenalty = density * 0.15 * (1.0 - rainFactor * 0.80);
+        const threshold = Math.min(0.85, Math.max(0.18,
+          0.52 - densityPenalty + rainFactor * 0.28
+        ));
         const h = terrain(pLat, pLng);
         if (h >= threshold) { lng += step; continue; }
 
         const frac = (threshold - h) / threshold;
-        const depthCm = baseD * mult * frac * boost * (zoom < 10 ? 0.55 : 0.85);
-        if (depthCm < 3) { lng += step; continue; }
+        // Depth: urban areas get shallower water (faster drainage)
+        const urbanFactor = 1.0 - density * 0.30 * (1.0 - rainFactor * 0.50);
+        const depthCm = baseD * mult * frac * boost * urbanFactor * (zoom < 10 ? 0.60 : 0.90);
+        if (depthCm < 2) { lng += step; continue; }
 
         const [r, g, b, alpha] = depthToRgba(depthCm);
         if (alpha < 0.01) { lng += step; continue; }
